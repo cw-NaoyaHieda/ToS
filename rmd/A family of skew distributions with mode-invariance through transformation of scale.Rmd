@@ -1,0 +1,81 @@
+---
+title: "A family of skew distributions with mode-invariance through transformation of scale"
+date: "`r Sys.Date()`"
+author: Naoya Hieda
+output:
+  rmdformats::readthedown:
+    highlight: kate
+    toc_depth: 2
+    number: TRUE
+    css: "/Users/naoya/Desktop/ToS/toc.css"
+    pandoc_args: [
+        "--from", "markdown+autolink_bare_uris+tex_math_single_backslash-implicit_figures"
+        ]
+---
+
+
+```{r knitr_init, echo=FALSE, cache=FALSE}
+library(knitr)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=FALSE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+
+# Abstract
+
+最近、正規化定数が変わらず、単峰性(unimodality)が容易に保証されるスケール変換の特定のクラスを使用して、skew分布の新しい分布族が提案された。
+本論文では、この分布族のモード不変性を紹介する。
+これにより、歪度の単調性を含む特定の特性を簡単に調べ、さまざまな好ましい特性を組み込むことができる。 
+skew分布に対するエントロピー最大化について論じる。
+数値的な研究も行われている。
+
+```{r set}
+library(tidyverse)
+library(reshape2)
+library(DT)
+library(formattable)
+```
+
+# 導入
+
+近年、skew分布の多くの種類が提案されている。
+さまざまな研究がGentonとAzzaliniによって導入され、調べられた。 skew分布の最近の進展は(17,13)で与えられている。
+その中で、この論文はJonesによって提案されたskew分布の分布族に焦点を当てている。
+密度関数は
+$$
+f^∗(x) = f (r(x))
+$$
+基礎密度f(y)は対称であり、$r(x)$は特定のスケール変換である。
+これは、ToS分布[12]と呼ばれていた。$s(y)=r^{-1}(y)$とする。
+顕著な点は、$s'(y)+ s'(-y)=2$のとき、正規化定数が変わらないことである。
+以下では、$f(y)がy=0$で単峰性であると仮定する。
+単純条件$r'(x)>0はf*(x)$の一様性を保証する。
+特殊ケースは、Baker[6]によるSchlömilch変換と、Jones and Pewsey [16]による循環データの逆Batschelet変換で説明されている。
+スケールパラメータを持つToS分布族には、
+2分割分布[8]が含まれていることに注意する。
+関数$s(y)$は
+$$
+s(y) = y + H(y)
+$$
+$s(y)$の代わりに関数$H(y)$に注目する。
+関数$H(y)$は、セクション2で見られるように、ToS分布の歪度に重要な役割を果たす。
+本論文では、$H(0)=0$と仮定し、これは$f*(x)$のモードが任意の$f$と$H$に対して常に0であるモード不変性を意味する。
+これは、ToS分布における特別な位置母数である。
+歪度の単調性についてのいくつかの研究がある[5,11]。
+
+
+
+
+
+
+
+
+
