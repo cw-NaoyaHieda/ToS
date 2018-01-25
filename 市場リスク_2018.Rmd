@@ -36,7 +36,7 @@ set.seed(2017)
 
 ```{r package}
 #実験で使う関数
-source("/Users/naoya/Desktop/ToS/script/functions.R")
+source("script/functions.R")
 objects()
 #パッケージのインストールと読み込み
 #持ってないパッケージはインストールする
@@ -52,7 +52,7 @@ for(package in targetPackages) library(package, character.only = T)
 
 ```{r n225}
 #データの読み込み
-n225 <- read.csv("/Users/naoya/Desktop/ToS/data/nikkei225.csv",skip=1)
+n225 <- read.csv("data/nikkei225.csv",skip=1)
 y <- NULL
 #終値(1日の最後の値段)を使う
 y$Close <- n225$PX_LAST
