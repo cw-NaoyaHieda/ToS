@@ -104,7 +104,7 @@ find.ES <- function(p, par){
 #局度変換を伴うsinh-arcsinh分布の単純モンテカルロ法によってVaR,ESを求める関数
 SMC.fa <-function(theta){
   ## 正規分布からの重点サンプリングで乱数を取得
-  rand.fa<-rfa_SIR(n=20000, mu=theta[1], 
+  rand.fa<-rfa_SIR_para(n=20000, mu=theta[1], 
                    sigma=theta[2], 
                    lambda=theta[3],
                    delta=theta[4])
@@ -113,7 +113,7 @@ SMC.fa <-function(theta){
   # 単純モンテカルロ法
   # 100番目から10000番目まで数を増やしていってVaRを計算
   #hosts <- rep('localhost',12)
-  VaR1 <- sapply(100:10000, function(x) quantile(y[1:x], c(0.01,0.025, 0.05)))
+  VaR1 <- parSapply(cl,100:10000, function(x) quantile(y[1:x], c(0.01,0.025, 0.05)))
   
   
   ## FA分布のVaRの真値を計算
@@ -128,7 +128,7 @@ SMC.fa <-function(theta){
   
   # 単純モンテカルロ法
   # ESの計算
-  Es1 <- sapply(100:10000, function(x) {
+  Es1 <- parSapply(cl,100:10000, function(x) {
     return(c( mean(y[1:x][y[1:x] < VaR.true.FA[1]]),   
               mean(y[1:x][y[1:x] < VaR.true.FA[2]]),
               mean(y[1:x][y[1:x] < VaR.true.FA[3]])
@@ -348,3 +348,31 @@ IS.norm<-function(theta)
   #abline(h=VaR.true[3],col=1)
   #abline(h=ES.true[3],col=2)
   return( list(out = cbind(t(out1),t(out25),t(out5)), VaR.true, ES.true ) ) }
+
+
+
+
+#SIR並列処理
+rfa_SIR_para <- function(n, mu, sigma, lambda, delta)
+{
+  ## 正規分布を提案分布に
+  q <- parSapply(cl,1:cl_l,
+                 function(x) rnorm(n/cl_l,mean=mu,sd=5*sigma))
+  ## 重み
+  w <-parSapply(cl, q, 
+                dfas2, mu=mu, sigma=sigma, lambda=lambda, delta=delta)/
+    parSapply(cl, q, dnorm, mean=mu, sd=5*sigma)
+  ## 合計が1になるように重みを基準化
+  w <- w/sum(w)
+  ## 重みに従ってresample
+  q.resample <- Resample_para(q, weight=w, NofSample = n)
+  list(q,q=q.resample, w=w)
+}
+## 重点サンンプリングに用いるResampleの関数
+Resample_para <- function(data, weight, NofSample){
+  re_ind <- as.vector(parSapply(cl, 1:cl_l, function(x)runif(NofSample/cl_l) ))
+  cmwt <- cumsum(weight)/sum(weight);
+  st <- parSapply(cl,re_ind, function(x) sum(x>cmwt[-length(cmwt)]))
+  newdata <- data[ (st+1) ]
+  return(newdata)
+}
