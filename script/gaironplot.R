@@ -119,12 +119,16 @@ df <- rbind(df1,df2)
 
 df <- data.frame(df, max=range_95_min[, 3], min = range_95_max[, 3])
 
+df$variable <- factor(df$variable, levels=c("ES99(IS)","ES99(SMC)","ES97.5(IS)","ES97.5(SMC)","ES95(IS)","ES95(SMC)"))
+
+#pattern1
 plot_b=ggplot(data=df)+
-  geom_line(aes(N,value,lty=variable,col=variable),size=.8)+
+  geom_ribbon(aes(x=N,ymin=min,ymax=max,fill=variable))+
   geom_hline(aes(yintercept=-ES.true.FA[1]))+
   geom_hline(aes(yintercept=-ES.true.FA[2]))+
   geom_hline(aes(yintercept=-ES.true.FA[3]))+
-  theme_bw()+ylab("Expected S")+
+  geom_line(aes(N,value,lty=variable,col=variable),size=.8)+
+  theme_bw()+ylab("Expected Shortfall")+
   theme(#panel.grid.major = element_blank(),
     #panel.grid.minor = element_blank(),
     strip.background = element_blank(),
@@ -132,18 +136,17 @@ plot_b=ggplot(data=df)+
     legend.title=element_blank(),legend.position=c(0.25,0.82),
     legend.direction = "horizontal",legend.key.width = unit(12, "points"))+
   facet_grid(.~method)+
-  geom_ribbon(aes(x=N,ymin=min,ymax=max,fill=variable),alpha=0.2)+
   xlim(c(0,10000))
 
 print(plot_b)
 
-
+#pattern2
 plot_b=ggplot(data=df)+
   geom_line(aes(N,value,lty=variable,col=variable),size=.8)+
   geom_hline(aes(yintercept=-ES.true.FA[1]))+
   geom_hline(aes(yintercept=-ES.true.FA[2]))+
   geom_hline(aes(yintercept=-ES.true.FA[3]))+
-  theme_bw()+ylab("Expected shortfall")+
+  theme_bw()+ylab("Expected Shortfall")+
   theme(#panel.grid.major = element_blank(),
     #panel.grid.minor = element_blank(),
     strip.background = element_blank(),
@@ -157,20 +160,20 @@ plot_b=ggplot(data=df)+
 
 print(plot_b)
 
-
+#pattern3
 plot_b=ggplot(data=df)+
-  geom_line(aes(N,value,lty=variable,col=variable),size=.8)+
+  geom_ribbon(aes(x=N,ymin=min,ymax=max,fill=variable),alpha=0.2)+
   geom_hline(aes(yintercept=-ES.true.FA[1]))+
   geom_hline(aes(yintercept=-ES.true.FA[2]))+
   geom_hline(aes(yintercept=-ES.true.FA[3]))+
-  theme_bw()+ylab("Expected shortfall")+
+  geom_line(aes(N,value,lty=variable,col=variable),size=.8)+
+  theme_bw()+ylab("Expected Shortfall")+
   theme(#panel.grid.major = element_blank(),
     #panel.grid.minor = element_blank(),
     strip.background = element_blank(),
     panel.border = element_rect(colour = "black"),
-    legend.title=element_blank(),legend.position=c(0.25,0.92),
+    legend.title=element_blank(),legend.position=c(0.35,0.9),
     legend.direction = "horizontal",legend.key.width = unit(12, "points"))+
-  geom_ribbon(aes(x=N,ymin=min,ymax=max,fill=variable),alpha=0.2)+
   xlim(c(0,10000))
 
 
@@ -195,26 +198,175 @@ SMC_ES_5 <- data.frame(SMC_ES_5 %>% melt(),name="ES95(SMC)")
 
 
 
+
 ES_box_IS <- rbind(IS_ES_1[,-2], IS_ES_25[,-2], IS_ES_5[,-2])
 ES_box_SMC <- rbind(SMC_ES_1[,-2], SMC_ES_25[,-2], SMC_ES_5[,-2])
 ES_box <- rbind(data.frame(ES_box_IS, method="IS"),
                 data.frame(ES_box_SMC, method="SMC"))
 ES_box$Var1 <- ES_box$Var1 + 99
 
-plot_b <- ES_box %>% filter(Var1 == 100| Var1 == 1000| Var1 == 2000 | Var1 == 3000 | Var1 == 4000 | Var1 == 5000|
-                              Var1 == 6000| Var1 == 7000 | Var1 == 8000 | Var1 == 9000 | Var1 == 10000)
 
-ggplot(plot_b, aes(x = as.factor(Var1),y = -value,fill=name,color=name))+
+#pattern4
+ggplot(ES_box %>% filter(Var1%%500 == 0), aes(x = as.factor(Var1),y = -value,fill=name,color=name))+
   geom_boxplot(position = "identity")+geom_hline(aes(yintercept=-ES.true.FA[1]))+
+  geom_hline(aes(yintercept=-ES.true.FA[2]))+
+  geom_hline(aes(yintercept=-ES.true.FA[3]))+
+  theme_bw()+ylab("Expected Shortfall")+
+  theme(#panel.grid.major = element_blank(),
+    #panel.grid.minor = element_blank(),
+    strip.background = element_blank(),
+    panel.border = element_rect(colour = "black"))+
+  xlab("N")+
+  facet_grid(method~.,scales = "free")+ylim(2.5,6.2)+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+  
+#pattern5
+plot_b=ggplot(data=df)+
+  geom_line(aes(N,value,lty=variable,col=variable),size=.8)+
+  geom_hline(aes(yintercept=-ES.true.FA[1]))+
+  geom_hline(aes(yintercept=-ES.true.FA[2]))+
+  geom_hline(aes(yintercept=-ES.true.FA[3]))+
+  theme_bw()+ylab("Expected Shortfall")+
+  theme(#panel.grid.major = element_blank(),
+    #panel.grid.minor = element_blank(),
+    strip.background = element_blank(),
+    panel.border = element_rect(colour = "black"),
+    legend.title=element_blank(),legend.position=c(0.25,0.82),
+    legend.direction = "horizontal",legend.key.width = unit(12, "points"))+
+  facet_grid(.~method)+
+  geom_line(aes(x=N,y=min,color=variable))+
+  geom_line(aes(x=N,y=max,color=variable))+
+  xlim(c(0,10000))
+
+print(plot_b)
+
+
+#pattern6
+plot_b=ggplot(data=df)+
+  geom_line(aes(N,value,lty=variable,col=variable),size=.8)+
+  geom_hline(aes(yintercept=-ES.true.FA[1]))+
+  geom_hline(aes(yintercept=-ES.true.FA[2]))+
+  geom_hline(aes(yintercept=-ES.true.FA[3]))+
+  theme_bw()+ylab("Expected Shortfall")+
+  theme(#panel.grid.major = element_blank(),
+    #panel.grid.minor = element_blank(),
+    strip.background = element_blank(),
+    panel.border = element_rect(colour = "black"),
+    legend.title=element_blank(),legend.position=c(0.35,0.9),
+    legend.direction = "horizontal",legend.key.width = unit(12, "points"))+
+  facet_grid(method~.)+
+  geom_line(aes(x=N,y=min,color=variable))+
+  geom_line(aes(x=N,y=max,color=variable))+
+  xlim(c(0,10000))
+
+print(plot_b)
+
+
+#patter7
+plot_b=ggplot(data=df)+
+  geom_line(aes(N,value,lty=variable,col=variable),size=.8)+
+  geom_hline(aes(yintercept=-ES.true.FA[1]))+
+  geom_hline(aes(yintercept=-ES.true.FA[2]))+
+  geom_hline(aes(yintercept=-ES.true.FA[3]))+
+  theme_bw()+ylab("Expected Shortfall")+
+  theme(#panel.grid.major = element_blank(),
+    #panel.grid.minor = element_blank(),
+    strip.background = element_blank(),
+    panel.border = element_rect(colour = "black"),
+    legend.title=element_blank(),legend.position=c(0.35,0.9),
+    legend.direction = "horizontal",legend.key.width = unit(12, "points"))+
+  geom_line(aes(x=N,y=min,color=variable))+
+  geom_line(aes(x=N,y=max,color=variable))+
+  xlim(c(0,10000))
+
+print(plot_b)
+
+
+#pattern8
+ggplot(data=df)+
+  geom_errorbar(aes(x=N, ymax = max, ymin = min, color=variable),width = 0.1)+
+  geom_hline(aes(yintercept=-ES.true.FA[1]))+
+  geom_hline(aes(yintercept=-ES.true.FA[2]))+
+  geom_hline(aes(yintercept=-ES.true.FA[3]))+
+  geom_point(aes(N,value,lty=variable,col=variable),size=.8)+
+  theme_bw()+ylab("Expected shortfall")+
+  theme(#panel.grid.major = element_blank(),
+    #panel.grid.minor = element_blank(),
+    strip.background = element_blank(),
+    panel.border = element_rect(colour = "black"),
+    legend.title=element_blank(),legend.position=c(0.32,0.9),
+    legend.direction = "horizontal",legend.key.width = unit(12, "points"))+
+  facet_grid(method~.)+
+  xlim(c(0,10000))
+
+
+#pattern9
+ggplot(data=df)+
+  geom_hline(aes(yintercept=-ES.true.FA[1]))+
+  geom_hline(aes(yintercept=-ES.true.FA[2]))+
+  geom_hline(aes(yintercept=-ES.true.FA[3]))+
+  geom_line(aes(N,value,lty=variable,col=variable),size=.8)+
+  theme_bw()+ylab("Expected shortfall")+
+  theme(#panel.grid.major = element_blank(),
+    #panel.grid.minor = element_blank(),
+    strip.background = element_blank(),
+    panel.border = element_rect(colour = "black"),
+    legend.title=element_blank(),legend.position=c(0.25,0.9),
+    legend.direction = "horizontal",legend.key.width = unit(12, "points"))+
+  geom_errorbar(aes(x=N, ymax = max, ymin = min, color=variable),alpha=0.01,width = 0.1)+
+  facet_grid(.~method)+
+  xlim(c(0,10000))
+
+#pattern10
+ggplot(data=df)+
+  geom_hline(aes(yintercept=-ES.true.FA[1]))+
+  geom_hline(aes(yintercept=-ES.true.FA[2]))+
+  geom_hline(aes(yintercept=-ES.true.FA[3]))+
+  geom_line(aes(N,value,lty=variable,col=variable),size=.8)+
+  geom_point(aes(N,value,lty=variable,col=variable),size=.8)+
+  theme_bw()+ylab("Expected shortfall")+
+  theme(#panel.grid.major = element_blank(),
+    #panel.grid.minor = element_blank(),
+    strip.background = element_blank(),
+    panel.border = element_rect(colour = "black"),
+    legend.title=element_blank(),legend.position=c(0.25,0.9),
+    legend.direction = "horizontal",legend.key.width = unit(12, "points"))+
+  geom_errorbar(aes(x=N, ymax = max, ymin = min, color=variable),alpha=0.01,width = 0.1)+
+  facet_grid(.~method)+
+  xlim(c(0,10000))
+
+#pattern11
+ggplot(data=df %>% filter(N%%50 == 0))+
+  geom_hline(aes(yintercept=-ES.true.FA[1]))+
   geom_hline(aes(yintercept=-ES.true.FA[2]))+
   geom_hline(aes(yintercept=-ES.true.FA[3]))+
   theme_bw()+ylab("Expected shortfall")+
   theme(#panel.grid.major = element_blank(),
     #panel.grid.minor = element_blank(),
     strip.background = element_blank(),
-    panel.border = element_rect(colour = "black"))+
-  xlab("N")+
-  facet_grid(method~.,scales = "free")+ylim(2.5,6.2)
+    panel.border = element_rect(colour = "black"),
+    legend.title=element_blank(),legend.position=c(0.32,0.9),
+    legend.direction = "horizontal",legend.key.width = unit(12, "points"))+
+  geom_errorbar(aes(x=N, ymax = max, ymin = min, color=variable), width = 0.1)+
+  geom_line(aes(N,value,lty=variable,col=variable),alpha=0.1,size=.8)+
+  facet_grid(method~.)+
+  xlim(c(0,10000))
 
-
-
+#pattern12
+ggplot(data=df %>% filter(N%%100 == 0))+
+  geom_line(aes(N,value,lty=variable,col=variable),size=.8)+
+  geom_hline(aes(yintercept=-ES.true.FA[1]))+
+  geom_hline(aes(yintercept=-ES.true.FA[2]))+
+  geom_hline(aes(yintercept=-ES.true.FA[3]))+
+  theme_bw()+ylab("Expected shortfall")+
+  theme(#panel.grid.major = element_blank(),
+    #panel.grid.minor = element_blank(),
+    strip.background = element_blank(),
+    panel.border = element_rect(colour = "black"),
+    legend.title=element_blank(),legend.position=c(0.25,0.9),
+    legend.direction = "horizontal",legend.key.width = unit(12, "points"))+
+  geom_errorbar(aes(x=N, ymax = max, ymin = min, color=variable), width = 0.1)+
+  facet_grid(.~method)+
+  xlim(c(0,10000))
