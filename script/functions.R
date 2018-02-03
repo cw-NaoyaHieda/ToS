@@ -179,17 +179,18 @@ d.IS <- function(x, theta,par){
 # 重点分布(d.IS)からのサンプリング
 rIS_SIR <- function(n, par, par2, theta){
   ## 正規分布を提案分布に
-  q <- rnorm(n, mean=par2, sd=15)
+  q <- as.vector(parSapply(cl,1:cl_l,
+            function(x) rnorm(n/cl_l,mean=par2,sd=15)))
   ## 重み
-  w <- sapply(q, 
+  w <- parSapply(cl,q, 
               d.IS, theta =theta, par=par)/dnorm(q, mean=par2, sd=15)
   w <- w/sum(w)
   ## resample
-  q.resample <- Resample1(q, weight=w, NofSample = n)
+  q.resample <- Resample_para(q, weight=w, NofSample = n)
   list( q=q.resample, w=w)
 }
 # 重点サンプリングの関数(d.ISを提案分布に局度変換を伴うsinh-arcsinh分布のVaR,ESを求める)
-IS.fa <- function(processor){
+IS.fa <- function(){
   f <- function(x, theta, par){
     exp(theta*x)*dfas2(x, mu=par[1], sigma=par[2],
                        lambda=par[3], delta=par[4])
@@ -207,7 +208,7 @@ IS.fa <- function(processor){
   N <-10000
   
   #99%点での計算 100~10000までサンプル数を増やして行う
-  out1<- sapply( 100:N, function(x){
+  out1<- parSapply(cl, 100:N, function(x){
     # サンプルの対応するweightをくっつける
     out1<-cbind( rfa1[1:x],  w1[1:x]/x)
     # サンプルの小さい順にならべかえる
@@ -224,7 +225,7 @@ IS.fa <- function(processor){
   #abline(h=VaR.true.FA[1],col=1)
   #abline(h=ES.true.FA[1],col=2)
   
-  out25<-sapply(100:N, function(x){
+  out25<-parSapply(cl,100:N, function(x){
     out1<-cbind( rfa25[1:x],  w25[1:x]/x)
     A <- out1[sort.list(out1[,1]),]
     A <- cbind(A, cumsum(A[,2]))
@@ -236,7 +237,7 @@ IS.fa <- function(processor){
   #abline(h=VaR.true.FA[2],col=1)
   #abline(h=ES.true.FA[2],col=2)
   
-  out5<-sapply(100:N, function(x){
+  out5<-parSapply(cl,100:N, function(x){
     out1<-cbind( rfa5[1:x],  w5[1:x]/x)
     A <- out1[sort.list(out1[,1]),]
     A <- cbind(A, cumsum(A[,2]))
@@ -356,8 +357,8 @@ IS.norm<-function(theta)
 rfa_SIR_para <- function(n, mu, sigma, lambda, delta)
 {
   ## 正規分布を提案分布に
-  q <- parSapply(cl,1:cl_l,
-                 function(x) rnorm(n/cl_l,mean=mu,sd=5*sigma))
+  q <- as.vector(parSapply(cl,1:cl_l,
+                 function(x) rnorm(n/cl_l,mean=mu,sd=5*sigma)))
   ## 重み
   w <-parSapply(cl, q, 
                 dfas2, mu=mu, sigma=sigma, lambda=lambda, delta=delta)/
@@ -376,3 +377,27 @@ Resample_para <- function(data, weight, NofSample){
   newdata <- data[ (st+1) ]
   return(newdata)
 }
+
+
+
+# 重点サンプリングの関数(d.ISを提案分布に局度変換を伴うsinh-arcsinh分布のVaR,ESを求める)
+# weight^2を調べる
+IS.fa_check_weigth <- function(){
+  f <- function(x, theta, par){
+    exp(theta*x)*dfas2(x, mu=par[1], sigma=par[2],
+                       lambda=par[3], delta=par[4])
+  }
+  #weightを計算するためにMを計算する．99%,97.5%,95%をまとめて行う
+  M1 <- integrate(f, -30, 30, theta=theta.val1, par=fit$par2)$value
+  M25 <- integrate(f, -30, 30, theta=theta.val25, par=fit$par2)$value
+  M5 <- integrate(f, -30, 30, theta=theta.val5, par=fit$par2)$value
+  
+  #weightを計算する
+  w1 <- exp(-theta.val1*rfa1)*M1
+  w25 <- exp(-theta.val25*rfa25)*M25
+  w5 <- exp(-theta.val5*rfa5)*M5
+  
+  w1 <- w1 / sum(w1)
+  w25 <- w25 / sum(w25)
+  w5 <- w5 / sum(w5)
+  return( list(w1, w25, w5) ) }
