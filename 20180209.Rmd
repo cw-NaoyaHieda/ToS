@@ -23,13 +23,12 @@ library(rmdformats)
 options(max.print="75")
 opts_chunk$set(echo=TRUE,
 	             prompt=FALSE,
-               cache=TRUE,
                tidy=TRUE,
                comment=NA,
                message=FALSE,
                warning=FALSE,
                fig.width=6,
-               fig.height=6)
+               fig.height=4)
 opts_knit$set(width=75)
 set.seed(2017)
 ```
@@ -97,7 +96,7 @@ dev.copy2eps(file="plot/logreturn_20180209.eps")
 
 ## 尺度変換した<br>sinh-arcsinh分布の<br>パラメータ推定
 
-```{r MLE,fig.width=6,fig.height=2}
+```{r MLE,fig.height=4}
 rt <- df$log_x[-1]
 rt <- rt[rt!=0]
 fit <- mle.dfas2(rt, ini=c(0, log(0.2), -0.2, 0.5))
@@ -112,13 +111,13 @@ ggplot(df, aes(log_return))+
        xlim(min(rt),max(rt))+
        stat_function(fun=dnorm,
                          #colour="violetred",
-                         aes(color="red"),
+                         aes(color="Normal distribution"),
                          size=1,
                          n=401,
                          args=list(mean=mean(rt), sd = sd(rt)))+
        stat_function(fun=dfas2,
                          #colour="green",
-                         aes(color="blue"),
+                         aes(color="Tos sinh−arcsinh distribution"),
                          size=1,
                          n=401,
                          args=list(mu=fit$par2[1],
@@ -126,7 +125,9 @@ ggplot(df, aes(log_return))+
                                   lambda = fit$par2[3],
                                   delta = fit$par2[4]))+
         theme_bw()+
-  labs(x="log_return",y="density")
+  labs(x="log_return",y="density")+
+  scale_colour_manual(values = c("red", "blue"))+
+  theme(legend.position = "bottom") + labs(color = "")
 
 dev.copy2eps(file="plot/MLE_20180209.eps")
 ```
@@ -144,6 +145,7 @@ hyou.a[2,] <- c( mean(rt), sd(rt), 0, 3)
 hyou.a[3,] <- c(out.mom$m1, sqrt(out.mom$v2), out.mom$b1, out.mom$b2)
 dimnames(hyou.a) <- list( c("標本","N","FSA"), c("E(X)", "sqrt Var(X)", "beta1", "beta2"))
 print(hyou.a)
+print(xtable(hyou.a, digits=3))
 ```
 
 
@@ -181,7 +183,7 @@ f2 <- ggplot(df,aes(x=x))+
                                   sigma = fit$par2[2],
                                   lambda = fit$par2[3],
                                   delta = fit$par2[4]))+
-  labs(x="対数収益率",y="密度")+
+  labs(x="log return",y="density")+
   theme(legend.position = "none")
 
 f2
