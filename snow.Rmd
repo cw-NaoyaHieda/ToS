@@ -1,0 +1,314 @@
+---
+title: "parallel"
+author: "Naoya Hieda"
+date: "`r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+    number_sections: yes
+    css: "toc.css"
+    toc_depth: 2
+    pandoc_args: [
+        "--from", "markdown+autolink_bare_uris+tex_math_single_backslash-implicit_figures"
+        ]
+---
+
+
+```{r knitr_init, echo=FALSE, cache=FALSE}
+library(knitr)
+library(rmdformats)
+library(ggplot2)
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE,
+               fig.width=12,
+               fig.height=9)
+opts_knit$set(width=75)
+set.seed(2017)
+```
+
+
+Rの並列処理の件ですが、よく考えたら、研究の途中や、今年の実験の準備で少しふれてました。
+自分が理解している範囲ですがまとめてみました。
+パッケージがいくつかありますが、parallelでいいかと思います。
+
+ただし、環境によって、markdown上のコードだと並列処理ができない？疑惑があります。
+なので、チャンクごとに実行することで、確認していただいた方がわかりやすいかと思います。
+
+# 基本
+
+基本的にsapplyの処理をparSapllyという関数で並列に行ってくれます。  
+関数の種類は
+[parallelの並列計算関数](https://www.rdocumentation.org/packages/parallel/versions/3.4.1/topics/clusterApply)  
+parSapplyが簡単です(とりあえずコア数を書き足すだけでいいです)
+```{r}
+library(parallel)
+#使えるコアの数がこの関数で取得できます。
+detectCores()
+#まずはmakeCLusterで、複数のコアを呼び出します。全部を使うのは危険なので-1個準備します。
+#実はこの関数にちょっと時間がかかったりします
+cl <- makeCluster(detectCores() - 1, type="SOCK")
+```
+
+typeの部分によって、呼び出される並列処理の規格が変わるみたいですが、SOCKは特に準備しなくても大概のPCで使えるので、こちらでいいと思います。
+
+計測時間の見方です。  
+
+- ユーザ：記述をしたコマンドの処理時間
+- システム：システム(OSなど)に依る処理時間
+- 経過：コマンドの起動から終了までに要した時間
+単位は秒です、0.01秒レベルでは誤差が生じます(結局は3つめが全てです)
+
+```{r}
+library(parallel)
+cl <- makeCluster(detectCores() - 1, type="SOCK")
+system.time(one_core <- sapply(1:100,function(x) x*x))
+system.time(muliti_core <- parSapply(cl,1:100,function(x) x*x ))
+#使ったコアは次の関数で止められます
+stopCluster(cl)
+```
+
+流石に早くならないので、計算量を増やして、コア数ごとに行って見ます
+```{r,eval=FALSE}
+time_list <- system.time(oen_core <- sapply(1:1000000,function(x) x*x ))
+time_list <- data.frame(t(c(time_list)))
+
+for(i in 2:detectCores()){
+  cl <- makeCluster(i, type="SOCK")
+  time_list_tmp<- system.time(muliti_core <- parSapply(cl,1:10000000,function(x) sum(x) ) )
+  time_list <- cbind(time_list,time_list_tmp)
+  stopCluster(cl)
+}
+
+time_list <- t(time_list)[,1:3]
+
+rownames(time_list) <- c()
+ggplot(time_list %>% melt(),aes(x=Var1,y=value,colour=Var2)) +
+  geom_point() + geom_line() + facet_grid(Var2~.,scales = "free")
+```
+
+![](48check.png)
+
+OSの部分は、コアが多いと若干時間は増えますが、計算処理の時間に比べれば微々たるものでした。
+まぁ、今回の計算量なら8コアぐらいで十分でした。
+
+
+また、比較的使いやすい関数としては、clusterMapがあります。(mapplyの並列処理版です)
+```{r,eval=FALSE}
+cl <- makeCluster(detectCores() - 1, type="SOCK")
+A <- data.frame(1:100000000)
+B <- data.frame(1:100000000)
+clusterMap(cl, function(x,y){x*y}, A, B)
+
+```
+
+
+## 個人的には使いにくい?関数
+
+calusterCall関数はかくコアで同じ処理をしてくれます。
+```{r,eval=FALSE}
+cl <- makeCluster(4, type="SOCK")
+clusterCall(cl,rnorm,n=500)
+```
+
+
+コアの数だけ表示します。(というかかくコアでの値？)
+```{r,eval=FALSE}
+cl <- makeCluster(4, type="FORK")
+clusterEvalQ(cl,expr = 1)
+```
+
+# 乱数のseed
+
+並列処理で乱数を発生させる際に、seedを設定したい場合は、それぞれのコアに対して設定する必要があります  
+clusterSetupRNGで設定できます。この関数を使うには依存関係にあるsnowをinstallしてある必要があります。
+次のチャンクを何回実行しても、同じ結果が返ってきます。
+```{r,eval=FALSE}
+library(parallel)
+library(snow)
+cl <- makeCluster(4, type="SOCK")
+clusterSetupRNG(cl, seed=rep(1,4))
+random <- as.vector(parSapply(cl,1:4,function(x) rnorm(2)))
+random
+stopCluster(cl)
+```
+また、同じseedを別のコアに指定しても同じ乱数は帰ってこないみたいです。
+
+実際使用するときは、Nこの乱数が欲しい場合は
+`parSapply(cl,length(cl),function(x) rnorm(N/length(cl)))`
+にすると一番早いです。ただし、コア数とNの数に注意しないと、欲しい数だけ乱数が得られないので注意してください。
+
+# 並列処理に自作関数を使いたい
+
+makeClusterで呼び出している各コアの環境は、基本的に、Rを起動した時の環境です。  
+つまり、Rの基本関数以外は使うことができません。  
+ただし、parSapply()の関数の時点では現在の環境を使用するので、次のコードならOKです。
+```{r}
+library(parallel)
+sample_fanc <- function(x){x*x}
+cl <- makeCluster(4, type="SOCK")
+tmp <- parSapply(cl,1:8,sample_fanc)
+tmp
+```
+
+しかし、次のコードだとエラーしてしまいます。
+
+```{r,eval=FALSE}
+library(parallel)
+sample_fanc <- function(x){ sample_fanc2(x) }
+sample_fanc2 <- function(x){ x*x }
+cl <- makeCluster(4, type="SOCK")
+tmp <- parSapply(cl,1:8,sample_fanc)
+tmp
+```
+parSapplyの処理の中で、他の関数を使いたい場合は、次のように書いて、各コアに関数を送る必要があります。
+```{r}
+library(parallel)
+sample_fanc <- function(x){ sample_fanc2(x) }
+sample_fanc2 <- function(x){ x*x }
+cl <- makeCluster(4, type="SOCK")
+clusterExport(cl,"sample_fanc2")
+tmp <- parSapply(cl,1:8,sample_fanc)
+tmp
+```
+変数の場合も同様に読み込んで上げる必要があります。
+
+```{r}
+library(parallel)
+cl <- makeCluster(4, type="SOCK")
+clusterExport(cl,list("sample_fanc2"))
+tmp <- parSapply(cl,1:8,sample_fanc)
+tmp
+```
+
+
+# SIRを並列処理
+
+塩濱先生が実験用に作成してくださった、Fujisawa-Abe分布からのSIRを並列処理で行って見ます。  
+
+```{r rfa_SIR}
+## 関数S(x)
+Sf <- function(x, delta){
+  sinh(delta*asinh(x))
+}
+## 関数C(x)
+Cf <- function(x, delta){
+  sqrt(1+Sf(x, delta)^2)
+}
+## sinh-arcsinh分布
+dfas <- function(x, delta){
+  Cf(x, delta)*exp(-Sf(x, delta)^2/2)*delta/sqrt(2*pi*(1+x^2))
+}
+## 関数s_inverse(x)
+s_inverse = function(x, lambda){
+  alambda=1-exp(-lambda^2)
+  if(lambda !=0){ return(
+    (lambda*x+ alambda-alambda*sqrt( (lambda*x+alambda)^2+1-alambda^2))/(lambda*(1-alambda^2)))
+  } else if (lambda ==0){ return(x) }
+}
+## 局度変換を伴うsinh-arcsinh分布
+dfas2 <- function(x, mu, sigma, lambda, delta){
+  r <-s_inverse( (x-mu)/sigma, lambda)
+  return(dfas(r, delta)/sigma)
+}
+## 重点サンンプリングに用いるResampleの関数
+Resample1 <- function(data, weight, NofSample){
+  re_ind <- runif(NofSample)
+  cmwt <- cumsum(weight)/sum(weight);
+  st <- sapply(re_ind, function(x) sum(x>cmwt[-length(cmwt)]))
+  newdata <- data[ (st+1) ]
+  return(newdata)
+}
+## 重点サンンプリングに用いるResampleの関数
+Resample_para <- function(data, weight, NofSample){
+  re_ind <- as.vector(parSapply(cl, 1:cl_l, function(x)runif(NofSample/cl_l) ))
+  cmwt <- cumsum(weight)/sum(weight);
+  st <- parSapply(cl,re_ind, function(x) sum(x>cmwt[-length(cmwt)]))
+  newdata <- data[ (st+1) ]
+  return(newdata)
+}
+rfa_SIR <- function(n, mu, sigma, lambda, delta)
+{
+  ## 正規分布を提案分布に
+  q <- rnorm(n, mean=mu, sd=5*sigma)
+  ## 重み
+  w <- sapply(q, 
+              dfas2, mu=mu, sigma=sigma, lambda=lambda, delta=delta)/dnorm(q, mean=mu, sd=5*sigma)
+  ## 合計が1になるように重みを基準化
+  w <- w/sum(w)
+  ## 重みに従ってresample
+  q.resample <- Resample1(q, weight=w, NofSample = n)
+  list(q=q.resample, w=w)
+}
+
+rfa_SIR_para <- function(n, mu, sigma, lambda, delta)
+{
+  ## 正規分布を提案分布に
+  q <- parSapply(cl,1:cl_l,
+                 function(x) rnorm(n/cl_l,mean=mu,sd=5*sigma))
+  ## 重み
+  w <-parSapply(cl, q, 
+              dfas2, mu=mu, sigma=sigma, lambda=lambda, delta=delta)/
+    parSapply(cl, q, dnorm, mean=mu, sd=5*sigma)
+  ## 合計が1になるように重みを基準化
+  w <- w/sum(w)
+  ## 重みに従ってresample
+  q.resample <- Resample_para(q, weight=w, NofSample = n)
+  list(q,q=q.resample, w=w)
+}
+```
+
+```{r}
+library(parallel)
+cl <- makeCluster(25, type="SOCK")
+cl_l <- length(cl)
+clusterExport(cl,list("s_inverse","dfas","Cf","Sf","cl_l"))
+system.time(rand.fa<-rfa_SIR(n=10000, mu=0,
+                 sigma = 1,
+                 lambda = 1,
+                 delta = 1))
+system.time(rand.fa_para<-rfa_SIR_para(n=10000, mu=0,
+                 sigma = 1,
+                 lambda = 1,
+                 delta = 1))
+stopCluster(cl)
+```
+
+```{r}
+library(parallel)
+cl <- makeCluster(25, type="SOCK")
+cl_l <- length(cl)
+clusterExport(cl,list("s_inverse","dfas","Cf","Sf","cl_l"))
+system.time(rand.fa<-rfa_SIR(n=100000, mu=0,
+                 sigma = 1,
+                 lambda = 1,
+                 delta = 1))
+system.time(rand.fa_para<-rfa_SIR_para(n=100000, mu=0,
+                 sigma = 1,
+                 lambda = 1,
+                 delta = 1))
+stopCluster(cl)
+```
+
+めちゃめちゃ早いです
+```{r}
+ggplot()+geom_histogram(data=data.frame(sample=rand.fa$q),aes(x=sample),
+                        binwidth = 14/100)+theme_bw()+
+  theme(axis.title.x = element_text(size=25),axis.title.y = element_text(size=25))+
+  theme(axis.text.x = element_text(size=25),axis.text.y = element_text(size=25)) +
+  theme(legend.title = element_text(size=25),legend.text = element_text(size=25))
+
+ggplot()+geom_histogram(data=data.frame(sample=rand.fa_para$q),aes(x=sample),
+                        binwidth = 14/100)+theme_bw()+
+  theme(axis.title.x = element_text(size=25),axis.title.y = element_text(size=25))+
+  theme(axis.text.x = element_text(size=25),axis.text.y = element_text(size=25)) +
+  theme(legend.title = element_text(size=25),legend.text = element_text(size=25))
+
+```
+

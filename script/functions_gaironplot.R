@@ -23,7 +23,6 @@ SMC.fa_gairon <-function(theta){
     
     # 真値と単純モンテカルロ法の結果をまとめる
     out <- cbind(out,t(Es1))
-    print(i)
   }
   return(out)
 } 

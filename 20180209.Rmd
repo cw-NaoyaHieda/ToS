@@ -1,7 +1,7 @@
 ---
-title: "市場リスク評価"
+title: "市場リスク評価_20180209"
 author: "Naoya Hieda"
-date: "`r Sys.Date()`"
+date: "2018-02-09"
 output:
   rmdformats::readthedown:
     highlight: kate
@@ -13,6 +13,7 @@ output:
         ]
 ---
 
+*2月7日に頂いたデータで出し直し*
 
 ```{r knitr_init, echo=FALSE, cache=FALSE}
 library(knitr)
@@ -22,12 +23,13 @@ library(rmdformats)
 options(max.print="75")
 opts_chunk$set(echo=TRUE,
 	             prompt=FALSE,
+               cache=TRUE,
                tidy=TRUE,
                comment=NA,
                message=FALSE,
                warning=FALSE,
-               fig.width=12,
-               fig.height=9)
+               fig.width=6,
+               fig.height=6)
 opts_knit$set(width=75)
 set.seed(2017)
 ```
@@ -47,11 +49,12 @@ if(length(newPackages)) install.packages(newPackages, repos = "http://cran.us.r-
 for(package in targetPackages) library(package, character.only = T)
 ```
 
+
 # 株価収益率の分析
 
 ```{r n225}
 #データの読み込み
-n225 <- read.csv("data/nikkei225.csv",skip=1)
+n225 <- read.csv("data/nky.csv",header=TRUE,skip=4)
 y <- NULL
 #終値(1日の最後の値段)を使う
 y$Close <- n225$PX_LAST
@@ -64,33 +67,37 @@ df <-data.frame(dt=y$ymd, x=y$Close)
 
 ## 日経225<br>平均株価指数の遷移
 
-```{r fig1}
+```{r n225plot}
 #ggplotで日経平均株価をplot
 #ggplotの各関数の意味は自分で調べること
 ggplot(df,aes(x=dt,y=x))+geom_line()+
         scale_x_datetime(breaks = date_breaks("6 months"))+
-        labs(y="N225")+
+        labs(x="Date",y="N225")+
         theme_bw()
+
+dev.copy2eps(file="plot/n225_20180209.eps")
 ```
 
 ## 日経平均の<br>対数収益率の推移
 
-```{r fig2}
+```{r n225logplot}
 #日経平均の対数収益率をplot
 df$log_x <- c(NA,diff(log(df$x))*100)
 ggplot(df[-1,],aes(dt,log_x))+geom_line()+
         scale_x_datetime(breaks = date_breaks("6 months"))+
-        labs(y="log return")+
+        labs(x="Date",y="log return")+
         theme_bw()+
         theme(strip.background = element_blank(),
               panel.border = element_rect(colour = "black"))
+
+dev.copy2eps(file="plot/logreturn_20180209.eps")
 ```
 
 # 最尤推定
 
 ## 尺度変換した<br>sinh-arcsinh分布の<br>パラメータ推定
 
-```{r MLE}
+```{r MLE,fig.width=6,fig.height=2}
 rt <- df$log_x[-1]
 rt <- rt[rt!=0]
 fit <- mle.dfas2(rt, ini=c(0, log(0.2), -0.2, 0.5))
@@ -105,13 +112,13 @@ ggplot(df, aes(log_return))+
        xlim(min(rt),max(rt))+
        stat_function(fun=dnorm,
                          #colour="violetred",
-                         aes(colour ="Normal distribution"),
+                         aes(color="red"),
                          size=1,
                          n=401,
                          args=list(mean=mean(rt), sd = sd(rt)))+
        stat_function(fun=dfas2,
                          #colour="green",
-                         aes(colour ="Tos sinh-arcsinh distribution"),
+                         aes(color="blue"),
                          size=1,
                          n=401,
                          args=list(mu=fit$par2[1],
@@ -119,7 +126,9 @@ ggplot(df, aes(log_return))+
                                   lambda = fit$par2[3],
                                   delta = fit$par2[4]))+
         theme_bw()+
-  theme(legend.position = "bottom")
+  labs(x="log_return",y="density")
+
+dev.copy2eps(file="plot/MLE_20180209.eps")
 ```
 
 
@@ -133,15 +142,14 @@ hyou.a <- matrix(0, 3,4)
 hyou.a[1,] <- c( mean(rt), sd(rt), skewness(rt), kurtosis(rt))
 hyou.a[2,] <- c( mean(rt), sd(rt), 0, 3)
 hyou.a[3,] <- c(out.mom$m1, sqrt(out.mom$v2), out.mom$b1, out.mom$b2)
-dimnames(hyou.a) <- list( c("sample","N","FSA"), c("E(X)", "sqrt Var(X)", "beta1", "beta2"))
-print(xtable(hyou.a, digits=3))
-hyou.a
+dimnames(hyou.a) <- list( c("標本","N","FSA"), c("E(X)", "sqrt Var(X)", "beta1", "beta2"))
+print(hyou.a)
 ```
 
 
 # sinh-arcsinh分布からの<br>　乱数生成<br>　(重点サンプリング)
 
-```{r sinh-arcsin_r}
+```{r sinh-arcsin_r,fig.width=6,fig.height=4}
 library(parallel)
 cl <- makeCluster(25, type="SOCK")
 cl_l <- length(cl)
@@ -151,15 +159,12 @@ rand.fa<-rfa_SIR_para(n=10000, mu=fit$par2[1],
                                   lambda = fit$par2[3],
                                   delta = fit$par2[4])
 
-ggplot()+geom_histogram(data=data.frame(sample=rand.fa$q),aes(x=sample),
-                        binwidth = 14/100)+theme_bw()
-
 ## 実際の分布との<br>比較
 
 df <-data.frame(x=rand.fa$q)
 f2 <- ggplot(df,aes(x=x))+
         geom_histogram(aes(y=..density.., fill=..count..),
-          binwidth = .15, colour="black") +xlab("log return")+
+          binwidth = .15, colour="black") +
          scale_fill_gradient("Count", low="#DCDCDC", high="#7C7C7C")+
         theme_bw()+
         theme(#panel.grid.major = element_blank(),
@@ -169,27 +174,32 @@ f2 <- ggplot(df,aes(x=x))+
         legend.title=element_blank(),legend.position="none")+
         stat_function(fun=dfas2,
                          #colour="violetred",
-                         aes(colour ="red"),
+                         aes(color="0"),
                          size=1,
                          n=401,
                          args=list(mu=fit$par2[1],
                                   sigma = fit$par2[2],
                                   lambda = fit$par2[3],
-                                  delta = fit$par2[4]))
+                                  delta = fit$par2[4]))+
+  labs(x="対数収益率",y="密度")+
+  theme(legend.position = "none")
 
 f2
 stopCluster(cl)
+
+dev.copy2eps(file="plot/sinh-arcsinh_20180209.eps")
 ```
 
+# 100回推定(ES)
+
+```{r,eval=FALSE}
+#面倒なので流用しています
+library(parallel)
+source("script/functions.R")
+source("script/functions_gaironplot.R")
 
 
-# FA分布の<br>　VaRとESの計算
-
-$\alpha=0.01, 0.025, 0.05$にしてVaRとESを推定する. 
-
-
-```{r vares2}
-## 真値を計算
+#真値計算
 #99%,97.5%,95%の各点に対して，先ほどの関数を用いて求める
 VaR1.fa <- qfas(0.01, mu=fit$par2[1], sigma=fit$par2[2],
                 lambda=fit$par2[3], delta = fit$par2[4])
@@ -199,89 +209,50 @@ VaR5.fa <- qfas(0.05, mu=fit$par2[1], sigma=fit$par2[2],
                 lambda=fit$par2[3], delta = fit$par2[4])
 #まとめておく
 VaR.true.FA <- c(VaR1.fa ,VaR25.fa ,VaR5.fa )
-
 ES1.fa <- find.ES(p=0.01, par=fit$par2)
 ES25.fa <- find.ES(p=0.025, par=fit$par2)
 ES5.fa <- find.ES(p=0.05, par=fit$par2)
 #まとめる
 ES.true.FA <- c(ES1.fa ,ES25.fa ,ES5.fa )
-ES.true.FA
-```
 
-```{r}
-library(parallel)
 cl <- makeCluster(25, type="SOCK")
 cl_l <- length(cl)
-clusterExport(cl,list("s_inverse","dfas","Cf","Sf","cl_l","fit"))
-## 単純<br>モンテカルロ法
+clusterExport(cl,list("s_inverse","dfas","dfas2","Cf","Sf","cl_l","fit","rfa_SIR","Resample1"))
 
-SMC.fa.out <- SMC.fa(fit$par2)
-```
 
-```{r}
-library(parallel)
-cl <- makeCluster(25, type="SOCK")
-cl_l <- length(cl)
-clusterExport(cl,list("s_inverse","dfas","Cf","Sf","cl_l","fit"))
+
+SMC.fa.out <- SMC.fa_gairon(fit$par2)
+
+SMC_ES_1 <- SMC.fa.out[,c(seq(1,300,3))]
+SMC_ES_25 <- SMC.fa.out[,c(seq(2,300,3))]
+SMC_ES_5 <- SMC.fa.out[,c(seq(3,300,3))]
+
+SMC_ES_mean <- data.frame(rowMeans(SMC_ES_1),rowMeans(SMC_ES_25),rowMeans(SMC_ES_5))
+SMC_ES_sd <- data.frame(apply(SMC_ES_1,1,sd),apply(SMC_ES_25,1,sd),apply(SMC_ES_5,1,sd))
+
 
 ## IS(重点サンプリング)による<br>VaRとESを計算
-
 # 99%,97.5%,95%それぞれのVaRと平均が一致するthetaを取得
 theta.val1<- find.theta(0.01, fit$par2)
 theta.val25<- find.theta(0.025, fit$par2)
 theta.val5<- find.theta(0.05, fit$par2)
 
 
+clusterExport(cl,list("VaR.true.FA"))
 
-# 密度関数の確認
-dx <- seq(-30,10,length=200)
-out1 <- sapply(dx, d.IS, theta=theta.val1, par=fit$par2)
-out25 <- sapply(dx, d.IS, theta=theta.val25, par=fit$par2)
-out5 <- sapply(dx, d.IS, theta=theta.val5, par=fit$par2)
-out <- cbind(out1,out25,out5)
-#matplot(dx,out,type="l",lwd=2)
-ggplot(data.frame(dx,out) %>% melt('dx'),
-       aes(x=dx,y=value,colour=variable))+
-  geom_line(size=2)+theme_bw()+
-  theme(legend.position = "bottom")
-
-clusterExport(cl,list("VaR.true.FA","dfas2"))
-
+out.fa<-c()
 rfa.IS.1<-rIS_SIR(n=20000, par=fit$par2, par2=VaR.true.FA[1], theta=theta.val1)
-
-1/sum(rfa.IS.1$w^2)
-
 rfa.IS.25<-rIS_SIR(n=20000, par=fit$par2, par2=VaR.true.FA[2], theta=theta.val25)
-
-1/sum(rfa.IS.25$w^2)
-
 rfa.IS.5<-rIS_SIR(n=20000, par=fit$par2, par2=VaR.true.FA[3], theta=theta.val5)
-
-1/sum(rfa.IS.5$w^2)
-
 # サンプリングしたものを入力としてFA分布の重点サンプリングを行う
 rfa1 <- sample(rfa.IS.1$q, 10000)
 rfa25 <- sample(rfa.IS.25$q, 10000)
 rfa5 <- sample(rfa.IS.5$q, 10000)
 clusterExport(cl,list("rfa1","rfa25","rfa5"))
-out.fa <- IS.fa_check_weigth()
-
-1/sum(out.fa[[1]]^2)
-1/sum(out.fa[[2]]^2)
-1/sum(out.fa[[3]]^2)
-
-stopCluster(cl)
-```
+try(out.fa <- cbind(out.fa,IS.fa_gairon()))
 
 
-```{r}
-cl <- makeCluster(25, type="SOCK")
-cl_l <- length(cl)
-clusterExport(cl,list("s_inverse","dfas","Cf","Sf",
-                      "cl_l","fit","VaR.true.FA","dfas2"))
-
-check_weight <-c()
-for(i in 1:10){
+while(dim(out.fa)[2] < 301){
   rfa.IS.1<-rIS_SIR(n=20000, par=fit$par2, par2=VaR.true.FA[1], theta=theta.val1)
   rfa.IS.25<-rIS_SIR(n=20000, par=fit$par2, par2=VaR.true.FA[2], theta=theta.val25)
   rfa.IS.5<-rIS_SIR(n=20000, par=fit$par2, par2=VaR.true.FA[3], theta=theta.val5)
@@ -290,11 +261,91 @@ for(i in 1:10){
   rfa25 <- sample(rfa.IS.25$q, 10000)
   rfa5 <- sample(rfa.IS.5$q, 10000)
   clusterExport(cl,list("rfa1","rfa25","rfa5"))
-  out.fa <- IS.fa_check_weigth()
-  
-  check_weight<- rbind(check_weight,
-  data.frame(w1=1/sum(out.fa[[1]]^2),w25=1/sum(out.fa[[2]]^2),w5=1/sum(out.fa[[3]]^2)))
+  try(out.fa <- cbind(out.fa,IS.fa_gairon()))
 }
+
 stopCluster(cl)
-check_weight
+
+IS_ES_1 <- out.fa[,c(seq(1,300,3))]
+IS_ES_25 <- out.fa[,c(seq(2,300,3))]
+IS_ES_5 <- out.fa[,c(seq(3,300,3))]
+
+IS_ES_mean <- data.frame(rowMeans(IS_ES_1),rowMeans(IS_ES_25),rowMeans(IS_ES_5))
+IS_ES_sd <- data.frame(apply(IS_ES_1,1,sd),apply(IS_ES_25,1,sd),apply(IS_ES_5,1,sd))
+
+
+
+range_95_IS_min <- data.frame(100:10000, -IS_ES_mean + 2 * IS_ES_sd)
+range_95_IS_max <- data.frame(100:10000, -IS_ES_mean - 2 * IS_ES_sd)
+range_95_SMC_min <- data.frame(100:10000, -SMC_ES_mean + 2 * SMC_ES_sd)
+range_95_SMC_max <- data.frame(100:10000, -SMC_ES_mean - 2 * SMC_ES_sd)
+names(range_95_IS_min)<- c("N","ES99(IS)","ES97.5(IS)","ES95(IS)")
+names(range_95_IS_max)<- c("N","ES99(IS)","ES97.5(IS)","ES95(IS)")
+names(range_95_SMC_min)<- c("N","ES99(SMC)","ES97.5(SMC)","ES95(SMC)")
+names(range_95_SMC_max)<- c("N","ES99(SMC)","ES97.5(SMC)","ES95(SMC)")
+range_95_IS_min=melt(range_95_IS_min,id.vars=c("N"))
+range_95_IS_max=melt(range_95_IS_max,id.vars=c("N"))
+range_95_SMC_min=melt(range_95_SMC_min,id.vars=c("N"))
+range_95_SMC_max=melt(range_95_SMC_max,id.vars=c("N"))
+
+tmp1 <- cbind(range_95_IS_min, method="IS")
+tmp2 <- cbind(range_95_SMC_min, method="SMC")
+range_95_min <- rbind(tmp1,tmp2)
+
+tmp1 <- cbind(range_95_IS_max, method="IS")
+tmp2 <- cbind(range_95_SMC_max, method="SMC")
+range_95_max <- rbind(tmp1,tmp2)
+
+out1 <-data.frame(100:10000, -IS_ES_mean)
+out2 <-data.frame(100:10000, -SMC_ES_mean)
+names(out1)<- c("N","ES99(IS)","ES97.5(IS)","ES95(IS)")
+names(out2)<- c("N","ES99(SMC)","ES97.5(SMC)","ES95(SMC)")
+
+df1=melt(out1,id.vars=c("N"))
+df2=melt(out2,id.vars=c("N"))
+
+df1 <- cbind(df1, method="IS")
+df2 <- cbind(df2, method="SMC")
+df <- rbind(df1,df2)
+
+
+df <- data.frame(df, max=range_95_min[, 3], min = range_95_max[, 3])
+
+df$variable <- factor(df$variable, levels=c("ES99(IS)","ES99(SMC)","ES97.5(IS)","ES97.5(SMC)","ES95(IS)","ES95(SMC)"))
+
+backcolour <- c("#FDE3E1","#F0EBCC","#CCF1D7","#CCF2F3","#DFEBFF","#FDE0F9")
 ```
+
+
+```{r}
+load("data/rdata20180208.RData")
+```
+
+
+```{r plot_ES,fig.width=7,fig.height=5}
+
+plot_b=ggplot(data=df)+
+  geom_ribbon(aes(x=N,ymin=min,ymax=max,fill=variable))+
+  geom_hline(aes(yintercept=-ES.true.FA[1]))+
+  geom_hline(aes(yintercept=-ES.true.FA[2]))+
+  geom_hline(aes(yintercept=-ES.true.FA[3]))+
+  geom_line(aes(N,value,lty=variable,col=variable),size=.8)+
+  theme_bw()+ylab("Expected Shortfall")+
+  theme(#panel.grid.major = element_blank(),
+    #panel.grid.minor = element_blank(),
+    strip.background = element_blank(),
+    panel.border = element_rect(colour = "black"),
+    legend.title=element_blank(),legend.position=c(0.25,0.82),
+    legend.direction = "horizontal",legend.key.width = unit(12, "points"))+
+  facet_grid(.~method)+
+  xlim(c(0,10000))+scale_fill_manual(values = c( backcolour))
+
+print(plot_b)
+
+
+dev.copy2eps(file="plot/ES100_20180209.eps")
+```
+
+
+
+
