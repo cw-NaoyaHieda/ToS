@@ -36,7 +36,7 @@ set.seed(2017)
 ```{r package}
 #実験で使う関数
 source("script/functions.R")
-source("script/funcitons_prediction.R")
+source("script/functions_rolling.R")
 objects()
 #パッケージのインストールと読み込み
 #持ってないパッケージはインストールする
@@ -75,7 +75,6 @@ ggplot(df,aes(x=dt,y=x))+geom_line()+
         labs(x="Date",y="N225")+
         theme_bw()
 
-dev.copy2eps(file="plot/n225_20180209.eps")
 ```
 
 ## 日経平均の<br>対数収益率の推移
@@ -89,8 +88,6 @@ ggplot(df[-1,],aes(dt,log_x))+geom_line()+
         theme_bw()+
         theme(strip.background = element_blank(),
               panel.border = element_rect(colour = "black"))
-
-dev.copy2eps(file="plot/logreturn_20180209.eps")
 ```
 
 
@@ -102,10 +99,7 @@ dim(df)
 str(df)
 ```
 
-
-
 # VaR,ESのローリング推定
-
 
 ```{r rollingB,eval=FALSE}
 cl <- makeCluster(detectCores()-1)  # クラスタの作成
@@ -156,16 +150,16 @@ result<-foreach(i = 2:(length(df$log_x)-249), .combine='cbind') %dopar% {
   IS.norm.out <- IS.norm_pre(theta)
   
   
-  c(i,IS.fa.out,IS.norm.out,SMC.fa.out,SMC.norm.out)
+  c(i,IS.fa.out,IS.norm.out,SMC.fa.out,SMC.norm.out,fit$par2,mean(rt), sd(rt))
 }
 
 stopCluster(cl)
-save(list=ls(), file="data/rolling.Rdata")
+save(list=c("result"),file="data/rolling_result.Rdata")
 ```
 
 
 ```{r}
-load("data/rolling.Rdata")
+load("data/rolling_result.Rdata")
 result <- t(result)
 colnames(result) <- c("dt",
                       "IS_VaR_fa_0.01","IS_ES_fa_0.01",
@@ -177,18 +171,23 @@ colnames(result) <- c("dt",
                       "SMC_VaR_fa_0.01","SMC_VaR_fa_0.025","SMC_VaR_fa_0.05",
                       "SMC_ES_fa_0.01","SMC_ES_fa_0.025","SMC_ES_fa_0.05",
                       "SMC_VaR_norm_0.01","SMC_VaR_norm_0.025","SMC_VaR_norm_0.05",
-                      "SMC_ES_norm_0.01","SMC_ES_norm_0.025","SMC_ES_norm_0.05")
+                      "SMC_ES_norm_0.01","SMC_ES_norm_0.025","SMC_ES_norm_0.05",
+                      "mu","sigma","lambda","delta","mean(rt)","sd(rt)")
 
 result_VaR <- result[,c(1,2,4,6,8,10,12,14,15,16,20,21,22)] %>% data.frame()
 
 result_ES <- result[,c(1,3,5,7,9,11,13,17,18,19,23,24,25)]  %>% data.frame()
+
+result_para <- result[,c(1,26,27,28,29,30,31)]  %>% data.frame()
 ```
 
 ```{r plot}
 result_VaR$dt <- df$dt[c(251:length(df$dt))]
 result_ES$dt <- df$dt[c(251:length(df$dt))]
+result_para$dt <- df$dt[c(251:length(df$dt))]
 plot_VaR <- result_VaR %>% data.frame() %>% melt(id="dt")
 plot_ES <- result_ES %>% data.frame() %>% melt(id="dt")
+plot_para <- result_para %>% data.frame() %>% melt(id="dt")
 
 plot_VaR$level <- apply(plot_VaR,1,function(x) substr(x["variable"],
                                     regexpr("0.0", x["variable"]),
@@ -211,18 +210,32 @@ plot_ES$method <- apply(plot_ES,1,function(x)
 
 ggplot() +
   geom_line(data=plot_VaR,
-    aes(x=dt,y=-value,colour=method)) +
+    aes(x=dt,y=value,colour=method)) +
   geom_line(data=df[c(252:length(df$dt)),],
             aes(x=dt,y=log_x))+
   facet_grid(level~.,scales = "free")+
-  theme_bw()
+  theme_bw()+
+  ggtitle("VaR and log return")
 
+ggplot() +
+  geom_line(data=plot_VaR,
+    aes(x=dt,y=-value,colour=method)) +
+  facet_grid(level~.,scales = "free")+
+  theme_bw()+
+  ggtitle("VaR")
 
 ggplot(plot_ES) +
   geom_line(aes(x=dt,y=-value,colour=method))+
   theme_bw()+
-  facet_grid(level~.,scales = "free")
+  facet_grid(level~.,scales = "free")+
+  ggtitle("ES")
 
+ggplot(plot_para) +
+  geom_line(aes(x=dt,y=value,color=variable))+
+  theme_bw()+
+  facet_grid(variable~.,scales = "free")+
+  ggtitle("parameters")+
+  guides(colour=FALSE)
 ```
 
 ```{r check}
