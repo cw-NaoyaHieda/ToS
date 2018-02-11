@@ -37,6 +37,7 @@ set.seed(2017)
 ```{r package}
 #実験で使う関数
 source("script/functions.R")
+source("script/functions_gaironplot.R")
 objects()
 #パッケージのインストールと読み込み
 #持ってないパッケージはインストールする
@@ -198,7 +199,6 @@ dev.copy2eps(file="plot/sinh-arcsinh_20180209.eps")
 #面倒なので流用しています
 library(parallel)
 source("script/functions.R")
-source("script/functions_gaironplot.R")
 
 
 #真値計算
@@ -349,5 +349,124 @@ dev.copy2eps(file="plot/ES100_20180209.eps")
 ```
 
 
+# 推定の表作成(N=1000)
 
+2018-02-10時点で、推定の表を作っていなかったので追加  
+もともと、sinh-arcsinhのVaRと正規分布のVaR,ESの推定を行っていなかったので、これらをやる。  
+10000はいらないので、1000まで
+
+## sinh-arcsinh
+
+```{r,eval=FALSE}
+cl <- makeCluster(25, type="SOCK")
+cl_l <- length(cl)
+clusterExport(cl,list("s_inverse","dfas","dfas2","Cf","Sf","cl_l","fit","rfa_SIR","Resample1","VaR.true.FA"))
+SMC.fa.out_1000 <- SMC.fa_gairon_1000(fit$par2)
+rfa.IS.1<-rIS_SIR(n=20000, par=fit$par2, par2=VaR.true.FA[1], theta=theta.val1)
+rfa.IS.25<-rIS_SIR(n=20000, par=fit$par2, par2=VaR.true.FA[2], theta=theta.val25)
+rfa.IS.5<-rIS_SIR(n=20000, par=fit$par2, par2=VaR.true.FA[3], theta=theta.val5)
+# サンプリングしたものを入力としてFA分布の重点サンプリングを行う
+rfa1 <- sample(rfa.IS.1$q, 10000)
+rfa25 <- sample(rfa.IS.25$q, 10000)
+rfa5 <- sample(rfa.IS.5$q, 10000)
+clusterExport(cl,list("rfa1","rfa25","rfa5"))
+out.fa_1000<-c()
+try(out.fa_1000 <- rbind(out.fa_1000,IS.fa_gairon_1000()))
+while(dim(out.fa_1000)[1] < 101){
+  rfa.IS.1<-rIS_SIR(n=20000, par=fit$par2, par2=VaR.true.FA[1], theta=theta.val1)
+  rfa.IS.25<-rIS_SIR(n=20000, par=fit$par2, par2=VaR.true.FA[2], theta=theta.val25)
+  rfa.IS.5<-rIS_SIR(n=20000, par=fit$par2, par2=VaR.true.FA[3], theta=theta.val5)
+  # サンプリングしたものを入力としてFA分布の重点サンプリングを行う
+  rfa1 <- sample(rfa.IS.1$q, 10000)
+  rfa25 <- sample(rfa.IS.25$q, 10000)
+  rfa5 <- sample(rfa.IS.5$q, 10000)
+  clusterExport(cl,list("rfa1","rfa25","rfa5"))
+  try(out.fa_1000 <- rbind(out.fa_1000,IS.fa_gairon_1000()))
+}
+stopCluster(cl)
+```
+
+## 正規分布
+
+```{r norm_answer,eval=FALSE}
+#データの読み込み
+n225 <- read.csv("data/nky.csv",header=TRUE,skip=4)
+y <- NULL
+#終値(1日の最後の値段)を使う
+y$Close <- n225$PX_LAST
+#日付データをDate型に変換
+y$ymd <- as.POSIXct(n225$Date)
+#データフレームにする(行列の列に名前がついているもの)
+#ggplotはdata.frameのデータにしか使えないので注意
+df <-data.frame(dt=y$ymd, x=y$Close)
+df$log_x <- c(NA,diff(log(df$x))*100)
+rt <- df$log_x[-1]
+rt <- rt[rt!=0]
+
+# 正規分布の場合はパラメータは平均と分散だけ
+theta <- c(mean(rt), sd(rt))
+f <-　function(x)  x*dnorm(x,mean=theta[1], sd=theta[2]) 
+VaR.true.norm <- qnorm(c(0.01,0.025,0.05), mean=theta[1], sd=theta[2])
+ES.true.norm <- sapply( c(0.01,0.025, 0.05), function(x){
+  integrate(f,
+            lower=-Inf, upper=qnorm(x,mean=theta[1], sd=theta[2]))$value/x})
+
+SMC.norm.out_1000 <- SMC.norm_1000(theta)
+
+
+#重点サンプリング
+N <-1000
+## IS for VaR
+Expected.val.th <- function(VaR, mu, sd){
+    #M <- exp(mu*th+ sd^2*th^2/2)
+    #m <- mu+sd^2*th
+    return( (VaR - mu)/sd^2 )}
+
+dIS.norm <- function(x, mean, sd, th ) {
+  M <- exp(mean*th+ sd^2*th^2/2)  
+  dnorm(x, mean=mean, sd =sd) * exp(th*x)/M}
+
+## 結局正規分布の場合は 平均をシフトさせるだけの演算
+## dnorm(x , mean = mu+sd^2*th, sd= theta[2] )
+##　重点分布からサンプリング
+out.norm_1000 <- c()
+for(i in 1:100){
+  out.norm_1000 <- rbind(out.norm_1000,IS.norm_1000(theta))
+}
+
+```
+
+
+## 表
+
+```{r}
+load("data/rdata20180210.RData")
+hyou1 <- matrix(0,6,6)
+hyou1[1,] <- c( VaR.true.norm, ES.true.norm)
+hyou1[2,] <- colMeans(out.norm_1000)[c(1,3,5,2,4,6)]
+hyou1[3,] <- colMeans(SMC.norm.out_1000)
+hyou1[4,] <- c( VaR.true.FA, ES.true.FA)
+hyou1[5,] <- colMeans(out.fa_1000)[c(1,3,5,2,4,6)]
+hyou1[6,] <- colMeans(SMC.fa.out_1000)
+
+dimnames(hyou1) <- list(rep(c("True", "IS","SMC"),2), 
+                      c("VaR99","VaR97.5","VaR95",
+                       "ES95","ES97.5","ES95"))
+hyou1
+print(xtable(hyou1, digit=3))
+
+hyou1 <- matrix(0,6,4)
+hyou1[1,] <- c( VaR.true.norm[-3], ES.true.norm[-3])
+hyou1[2,] <- colMeans(out.norm_1000)[c(1,3,2,4)]
+hyou1[3,] <- colMeans(SMC.norm.out_1000)[c(1,2,4,5)]
+hyou1[4,] <- c( VaR.true.FA[-3], ES.true.FA[-3])
+hyou1[5,] <- colMeans(out.fa_1000)[c(1,3,2,4)]
+hyou1[6,] <- colMeans(SMC.fa.out_1000)[c(1,2,4,5)]
+dimnames(hyou1) <- list(rep(c("True", "IS","SMC"),2), 
+                      c("VaR99","VaR97.5",
+                       "ES95","ES97.5"))
+
+hyou1
+print(xtable(hyou1, digit=3))
+```
 
