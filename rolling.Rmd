@@ -238,7 +238,10 @@ ggplot(plot_para) +
   guides(colour=FALSE)
 ```
 
+## 評価
+
 ```{r check}
+#VaR
 check_VaR <- apply(data.frame(df$log_x[251:length(df$log_x)], -result_VaR[,-1]), 1,
       function(x) x[1] > x[-1]) %>% t()
 
@@ -247,7 +250,9 @@ print("Check count over Estimate VaR")
 count_VaR/ dim(check_VaR)[1]
 
 #ES?
-colSums(check_VaR * -result_VaR[,-1]) / colSums(check_VaR)
+eval_ES <- check_VaR * apply(result_ES[,-1],2,function(x) abs(df$log_x[c(251:length(df$dt))] - x)/ -x)
+
+colMeans(eval_ES)
 ```
 
 
