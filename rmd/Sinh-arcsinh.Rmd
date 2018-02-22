@@ -1,0 +1,616 @@
+---
+title: "Sinh-arcsinh distributions a broad family giving rise to powerful tests of normality and symmetry"
+date: "`r Sys.Date()`"
+author: Naoya Hieda
+output:
+  rmdformats::readthedown:
+    highlight: kate
+    toc_depth: 2
+    number: TRUE
+    code_folding: hide
+    css: "/Users/naoya/Desktop/ToS/toc.css"
+    pandoc_args: [
+        "--from", "markdown+autolink_bare_uris+tex_math_single_backslash-implicit_figures"
+        ]
+---
+
+
+```{r knitr_init, echo=FALSE, cache=FALSE}
+library(knitr)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE,
+               fig.width = 5,
+               fig.height = 3)
+opts_knit$set(width=75)
+
+EqnNum_count <- 0
+
+EqnNum <-
+  function(head){
+    EqnNum_count <<- EqnNum_count + 1
+    return(EqnNum_count)
+  }
+```
+
+```{r set}
+library(tidyverse)
+library(reshape2)
+library(DT)
+library(formattable)
+```
+
+
+*Summary*
+
+「sinh-arcsinh変換」を導入し、
+位置と尺度以外のパラメータのない分布からの変数に適用することで
+ (論文内での多くのは正規分布)、「sinh-arcsinh分布」の新しい分布族を作る。
+この4つのパラメータ分布族?は、
+対称および偏りの両方のメンバを持ち、
+生成分布の重みと違う重み付けを可能にします。
+この分布族における正規分布の「中央」の場所は、
+非常に強力である選択肢の範囲のために最高水準よりも優れていると
+思われる尤度比検定を可能にする。?
+対称性の尤度比テストも利用可能であり、非常に成功している。
+3つのパラメータを持つ対称および非対称のサブファミリーもまた興味深い。
+Heavy-tailed対称sinh-arcsinh分布はJohnson $S_U$分布のように振る舞い、
+light-tailed対称sinh-arcsinh分布はRieckとNedelmanのsinh-normal分布のように振る舞う。
+sinh-arcsinh群は、 単一のパラメータで指定する。
+sinh-arcsinh分布族は非常に扱いやすく、多くの特性が探求されている。
+魅力的な再パラメータ化を含む、尤度推論が追求される。
+多変量バージョンが考慮される。
+オプションと拡張について説明する。
+
+# 導入
+
+location,scale,skewness,tail wiehgtを
+考慮した4つのパラメータを持つ分布の族は、
+実空間上の単一モード分布の最も重要な側面の多くをカバーする。
+
+これらは回帰型モデルのランダムな部分に対応させられる。
+通常、location(おそらくscaleも)パラメータの複雑なモデリングを
+潜在的に複雑にしながら、非対称性やtaileの重量に関してロバストに動作する。
+ピアソンとジョンソンの分布系のサブセットは有名な例である(Johnson et al,1994,Chapter 12)。
+
+- 安定法則?(stable laws)(Fernandez and Steel,1998)
+- 注文統計の一般化された分布(Jones, 2004)
+- 非常に人気のあるスキューのクラス(Samorodnitsky and Taqqu, 1994)
+- 一般化された双曲線分布(Barndorff-Nielsen、1978)
+- 対称密度が再スケールされた対称分布関数(Azzalini、1985、Genton, 2004)によって摂動される分布
+
+などが、他の例の中でも特に重要である。
+より多くの分布族が有限または半無限のサポートをしています。
+
+大まかに言えば、
+これらの分布群の大半は通常よりも重い裾を持つ分布族の他の分布などの特別な、
+しばしば限定的な場合としての正規分布を有する。 
+本論文では、「中央に位置する」正規分布と、より軽いテールとより重いテールの両方を有する他のメンバーとの、整数空間上の分布の比較的単純で扱いやすい4パラメータ系列を提案する。
+これは、特に、正規分布の妥当性の優れたテストを提供する上での実際的な利点を有する。
+
+新しい分布を記述するためには、位置母数$\mu\in\mathcal{R}$と
+尺度母数$\sigma>0$を取り除いた標準的なケースを考慮する。
+$\sigma^{-1}f_{\epsilon,\delta}(\sigma^{-1}(x-\mu))$を利用して通常の方法で実際の作業のために復帰させることができる。
+ここで、$f_{\epsilon,\delta}(x)$は新しい分布族の密度である。
+ここで、$\epsilon\in\mathcal{R}$は歪度パラメータになり、$\delta> 0$は尾部重みを制御する。
+乱数$Z$と$X_{\epsilon,\delta}$をそれぞれ標準正規密度$\phi$と$f_{\epsilon,\delta}$に関連付ける。
+次に、「sinh-arcsinh変換」と略称することによって、
+$f_{\epsilon,\delta}$を定義することを提案する
+
+$$
+Z = S_{\epsilon,\delta}(X_{\epsilon,\delta})\equiv sinh(\epsilon + \delta sinh^{-1}(X_{\epsilon,\delta})) \tag{`r EqnNum()`}
+$$
+
+```{r}
+## 関数S(x)
+Sf_origin <- function(x,delta,epsilon){
+  sinh(epsilon + delta * asinh(x) )
+}
+Sf <- function(x, delta){
+  sinh(delta*asinh(x))
+}
+```
+したがって、 'sinh-arcsinh分布'の密度は
+$$
+f_{\epsilon,\delta}(x)=\frac{1}{\sqrt{2\pi}}\frac{\delta C_{\epsilon,\delta}(x)}{\sqrt{1+x^2}}
+exp\{-\frac{1}{2}S^2_{\epsilon,\delta}(x)\}\tag{`r EqnNum()`}
+$$
+ここで$C_{\epsilon,\delta}(x)=cosh(\epsilon+\delta sinh^{-1}(x))=\sqrt{1+S^2_{\epsilon,\delta}(x)}$である。当然、$f_{0,1}(x)=\phi(x)$である。
+```{r}
+## 関数C(x)
+Cf_origin <- function(x, delta, epsilon){
+  sqrt(1+Sf_origin(x, delta, epsilon)^2)
+}
+Cf <- function(x, delta){
+  sqrt(1+Sf(x, delta)^2)
+}
+## sinh-arcsinh分布
+dfas_origin <- function(x, delta, epsilon){
+  return(Cf_origin(x, delta, epsilon)*
+    exp(-Sf_origin(x, delta, epsilon)^2/2)*
+    delta/sqrt(2*pi*(1+x^2)))
+}
+dfas <- function(x, delta){
+  Cf(x, delta)*exp(-Sf(x, delta)^2/2)*delta/sqrt(2*pi*(1+x^2))
+}
+```
+$f_{\epsilon,\delta}$の例は、下記のようになる。
+確認したが、上手いこと出ない(下に行ったら、変換した別の式があった)
+```{r}
+delta <- data.frame(delta=c(0.5, 0.625, 0.75, 1, 1.5, 2, 5))
+epsilon <- data.frame(epsilon=c(0, -0.25, -0.5, -0.75, -1))
+
+ggplot(data=data.frame(X=c(0,rep(0,5),1.5)), aes(x=X))+
+  mapply(function(delta)
+  stat_function(fun=dfas_origin,
+                         size=1,
+                         n=1001,
+                         args=list(delta = delta,
+                                  epsilon = -Inf),
+                aes_q(color=as.factor(delta))),
+                delta$delta)+
+        theme_bw()+
+  guides(color=guide_legend(title="delta"))+
+  theme(legend.position = "bottom")
+
+
+ggplot(data=data.frame(X=c(-4,rep(0,3),4)), aes(x=X))+
+  mapply(function(epsilon)
+  stat_function(fun=dfas_origin,
+                         size=1,
+                         n=401,
+                         args=list(delta = 1,
+                                  epsilon = epsilon),
+                aes_q(color=as.factor(epsilon))),
+                epsilon$epsilon)+
+        theme_bw()+
+  guides(color=guide_legend(title="epsilon"))+
+  theme(legend.position = "bottom")
+
+
+
+ggplot(data=data.frame(X=c(0,rep(0,5),1.5)), aes(x=X))+
+  mapply(function(delta)
+  stat_function(fun=dfas_origin,
+                         size=1,
+                         n=1001,
+                         args=list(delta = delta,
+                                  epsilon = 0),
+                aes_q(color=as.factor(delta))),
+                delta$delta)+
+        theme_bw()+
+  guides(color=guide_legend(title="delta"))+
+  theme(legend.position = "bottom")
+
+```
+
+いくつかの他の分布の分布族とは異なり、
+上のsinh-arcsinh分布の密度の定義に特別な関数は現れないことに注意する。
+
+全ての分布族の性質(2)は第2節で検討され、
+第3章ではその3パラメータ対称の副分布族
+($\epsilon=0$に対応する)のさらなる特性が考慮される。
+分布および分位関数、
+単峰性および瞬間の提供において、
+かなりの程度の扱いやすさが明らかである。
+テールウェイトも考慮される。
+$\epsilon$と$\delta$は
+van Zwet（1964）における歪度と尖度の
+パラメータであることが示されている。
+「スキューノーマル」分布の3パラメータ副分布族は、
+2.5節で簡単に説明されている。
+3.3節では、対称的な分布の場合に、分布族(2)の小さな
+$\delta$(heavy-tailed)の分布がJohnson（1949）$S_U$分布のように振る舞うのに対し、
+大きな$\delta$(light-tailed)の分布はRieckおよびNedelman(1991)sinh-normal分布のように振舞うことを示す。
+この意味で、対称なsinh-arcsinh分布は、
+2つの標準的な結合を形成する。
+単一パラメータ$\delta$は、正規分布($\delta$=1）を介して一方から他方への遷移を制御する。
+
+第4章で、(2)の形のsinh-arcsinh分布の最尤推定と
+導入された位置と尺度のパラメータを考慮する。
+冗長性は第4.1節で考察され、
+第4.2節で有用な再パラメータ化が導かれる。
+これらのサブセクションは
+sinh-arcsinh分布の3パラメータ対称副分布族に集中しているが、
+完全な4パラメータ分布族(4.3節)のフィッティングに使用するのと
+同じ再パラメータ化を採用(推奨)する。
+完全なsinh-arcsinh分布族のモデリングの柔軟性を示す例は、
+4.4節に示されている。
+正常性の尤度比検定(LRTs)$H_0\epsilon= 0,\delta= 1$は、sinh-arcsinh族で直ちに利用可能である。
+これらのテストのパフォーマンスは、
+セクション5で報告された実質的なシミュレーションの結果で調査される。
+実際に対称または非対称の分布と
+sinh-arcsinh群の分布とそれ以外の両方に対する
+正規性をテストすることを検討する。
+私たちは、パフォーマンスを、
+正常性の最も優れたオムニバステストの7つのパフォーマンスと比較し、
+LRTが正常性の最良のテストを提供するように見えると結論づける。
+
+対称性試験$(H_0:\epsilon=0)$のためのsinh-arcsinh LRTの同様の大規模シミュレーション研究が実施され、
+第6章で報告されている。
+ここでもまた、優れたパフォーマンスを見て、
+最高水準の技術を代表する2つの競合するオムニバステストよりも
+優れていることを示している。
+
+多変量正規分布の周辺変換によって、
+上記の単変量分布を多変量の場合に
+直接的に拡張することができる。
+得られた多変量分布は、
+第7節で比較的簡単に考慮され、
+その依存性が重視されている。
+
+第8節では、sinh-arcsinh分布(2)が異なるように
+定式化された3つの方法を考察する。
+第8.1節では、$H(\epsilon+\delta H^{-1}(X))$の変換のクラス内での
+変換関数の選択について議論する。
+第8.2節では、分布族における「中心的な」対称分布の役割に
+対する通常の選択肢を調査する。
+また、8.3節では、(同じ)対称な分布を歪める別の
+アプローチを検討する。
+興味深いいくつかの検討事項や代替案があることが判明しているが、
+最終的な結果は、(2)で行われた選択が正当であるとなる。
+第9章で議論が終わる。
+
+# 分布族の特性(2)
+
+## 基本的な特性
+
+変換（1）のいくつかの等価な定式化に注目することから始める:
+$sinh(x)=\frac{e^x-e^{-x}}{2}$と$sinh^{-1}(x)=log(x+\sqrt{x^2+1})$より、
+$$
+S_{\epsilon,\delta}(X)=
+\frac{1}{2}
+\{e^{\epsilon}exp(\delta sinh^{-1}(X))
+-e^{-\epsilon}exp(-\delta sinh^{-1}(X))\}, \\
+=\frac{1}{2}\{e^{\epsilon}(\sqrt{X^2+1}+X)^\delta
+-e^{-\epsilon}(\sqrt{X^2+1}+X)^{-\delta}\},\tag{`r EqnNum()`}
+$$
+
+$$
+=\frac{1}{2}\{e^{\epsilon}(\sqrt{X^2+1}+X)^\delta
+-e^{-\epsilon}(\sqrt{X^2+1}-X)^{\delta}\} \tag{`r EqnNum()`}
+$$
+
+---
+
+一応(4)の確認
+```{r}
+s_conv <- function(x,delta,epsilon){
+  1/2*(
+    exp(epsilon) * (sqrt(x^2 + 1) + x)^delta -
+    exp(-epsilon) * (sqrt(x^2 + 1) - x)^delta
+    )
+}
+ggplot(data=data.frame(X=c(-5,rep(0,5),5)), aes(x=X))+
+  stat_function(fun=Sf_origin,
+                         size=1,
+                         n=1001,
+                         args=list(delta = 1,
+                                  epsilon = 0),
+                aes(color="S"),linetype=2)+
+  stat_function(fun=s_conv,
+                         size=1,
+                         n=1001,
+                         args=list(delta = 1,
+                                  epsilon = 0),
+                aes(color="S_conv"),linetype=3)+
+        theme_bw()+
+  guides(color=guide_legend(title="function"))+
+  theme(legend.position = "bottom")
+
+ggplot(data=data.frame(X=c(-5,rep(0,5),5)), aes(x=X))+
+  stat_function(fun=Sf_origin,
+                         size=1,
+                         n=1001,
+                         args=list(delta = 4,
+                                  epsilon = 2),
+                aes(color="S"),linetype=2)+
+  stat_function(fun=s_conv,
+                         size=1,
+                         n=1001,
+                         args=list(delta = 4,
+                                  epsilon = 2),
+                aes(color="S_conv"),linetype=3)+
+        theme_bw()+
+  guides(color=guide_legend(title="function"))+
+  theme(legend.position = "bottom")
+```
+
+OK
+
+---
+
+また、$sinh^{-1}(Z)=\epsilon+\delta sinh^{-1}(X_{\epsilon,\delta})$または、
+$X_{\epsilon,\delta}=sinh[\delta^{-1}\{sinh^{-1}(Z)-\epsilon\}]$とする。
+後者の式を使用すると、ランダムな変量生成が即座に行われる。
+
+第2に、密度(2)に関連する分布関数は、即座にかけ、
+$$
+F_{\epsilon,\delta}(x)=\Phi(S_{\epsilon,\delta}(x))
+$$
+ここで$\Phi$は標準正規分布の分布関数である。
+
+---
+
+上式の確認
+```{r}
+dFas_conv_origin <- function(x,delta,epsilon){
+  pnorm(s_conv(x,delta = delta,epsilon = epsilon))
+}
+#積分したバージョン
+dFas_int <- function(x, delta, epsilon){
+  f <- function(y){dfas_origin(y, delta, epsilon)}
+  return(
+    sapply(x, function(z)
+    integrate( f, lower=-Inf, upper=z)$value)
+    )
+}
+
+
+ggplot(data=data.frame(X=c(-5,rep(0,5),5)), aes(x=X))+
+  stat_function(fun=dFas_conv_origin,
+                         size=1,
+                         n=1001,
+                         args=list(delta = 1,
+                                  epsilon = 0),
+                aes(color="dF_conv"),linetype=2)+
+   stat_function(fun=dFas_int,
+                         size=1,
+                         n=1001,
+                         args=list(delta = 1,
+                                  epsilon = 0),
+                aes(color="dF_integrate"),linetype=3)+
+        theme_bw()+
+  guides(color=guide_legend(title="delta"))+
+  theme(legend.position = "bottom")
+
+
+ggplot(data=data.frame(X=c(-5,rep(0,5),5)), aes(x=X))+
+  stat_function(fun=dFas_conv_origin,
+                         size=1,
+                         n=1001,
+                         args=list(delta = 4,
+                                  epsilon = 2),
+                aes(color="dF_conv"),linetype=2)+
+   stat_function(fun=dFas_int,
+                         size=1,
+                         n=1001,
+                         args=list(delta = 4,
+                                  epsilon = 2),
+                aes(color="dF_integrate"),linetype=3)+
+        theme_bw()+
+  guides(color=guide_legend(title="delta"))+
+  theme(legend.position = "bottom")
+
+```
+
+OK
+
+---
+
+第3に、$S^{-1}_{\epsilon,\delta}(z)=S_{-\epsilon/\delta,1/\delta}(z)$
+なので、密度（2）に関連する分位関数は
+$$
+Q_{\epsilon,\delta}(u)=S_{-\epsilon/\delta,1/\delta}(\Phi^{-1}(u))\hspace{8mm}0<u<1\tag{`r EqnNum()`}
+$$
+
+特に、分布の中央値は $-sinh(\epsilon/\delta)$である。
+
+---
+
+確認
+```{r,fig.width=9,fig.height=5}
+delta <- c(0.5, 1, 2)
+epsilon <- c(0.25 , 0, -0.25)
+parameters <- expand.grid(delta=delta,epsilon=epsilon)
+qFas_conv <- function(u,delta,epsilon){
+  s_conv(x = qnorm(u),
+                   delta = 1/delta,
+                   epsilon = -epsilon/delta)
+}
+
+ggplot(data=data.frame(X=c(0,rep(0,5),1)), aes(x=X))+
+  mapply(function(delta,epsilon,co)
+  stat_function(fun=qFas_conv,
+                         size=1,
+                         n=1001,
+                         args=list(delta = delta,
+                                  epsilon = epsilon),
+                aes_q(color=co)),
+                parameters$delta, parameters$epsilon,
+  sprintf("delta=%.1f epsilon=%.2f", parameters$delta, parameters$epsilon)
+  )+
+        theme_bw()+
+  guides(color=guide_legend(title="parameter"))+
+  theme(legend.position = "bottom")+
+  xlab("p")+ylab("x")
+```
+
+それっぽくはなってる
+
+---
+
+epsilonをいじれば、中央値がずれそう。
+
+第4に、密度(2)は常に単峰性である。
+これを見るために、$\log f_{\epsilon,\delta}(x)$の一次導関数は
+$$
+-\frac{x}{1+x^2}-\frac{\delta S^3_{\epsilon,\delta(x)}}{\sqrt{1+x^2}C_{\epsilon,\delta}(x)}.
+$$
+この導関数がゼロである任意の点$x_0$は、
+$$
+\frac{\delta S^3_{\epsilon,\delta}(x_0)}{\sqrt{1+S^2_{\epsilon,\delta}(x_0)}}=-\frac{x_0}{\sqrt{1+x_0^2}}.
+$$
+しかし、この方程式の左辺は、
+すべての実数値を取る$x_0$に対して、単調に増加する関数であり、
+一方、右辺は、$x_0$に対して、単調に減少して1から-1の値をとる関数である。
+したがって、交差点は1つしかないので、密度は単峰性である。 もちろん、$\epsilon=0,x_0=0$そうでなければ$x_0\neq0$である。
+
+## Skweness
+
+まず、この節では、$f_{-\epsilon,\delta}(x)= f_{\epsilon,\delta}(-x)$であることに注意する。
+固定された$\delta$について、
+$\epsilon$はvan Zwet(1964)の歪度の意味において
+歪度パラメータとして作用することを示すことができる。
+$G_2^{-1}(G1)$がすべてのxに対して凸であれば、
+上式より$G1\leq G2$を定義する。
+今、$\epsilon_1>\epsilon_2$で
+$G_1=F_{\epsilon1,\delta}$と
+$G_2=F_{\epsilon2,\delta}$を定義する。
+ここで、$c=(\epsilon_1-\epsilon_2)/\delta>0$とし、
+$F_{\epsilon2,\delta}^{-1}(F_{\epsilon1,\delta}(x))=S_{c,1}(x)$であり、かつ、
+$$
+\frac{d^2 F^{-1}_{\epsilon2,\delta}(F_{\epsilon1,\delta}(x))}{d^2x}=
+\frac{\sqrt{1+S_{c,1}^2(x)}}{1+x^2}
+\left(
+\frac{S_{c,1}(x)}{\sqrt{1+S_{c,1}^2(x)}}-\frac{x}{\sqrt{1+x^2}}
+\right)
+$$
+ここで$c>0$で$S_{c,1}(x)>x$なので、上式は正の値をとる。
+
+---
+
+$F_{\epsilon2,\delta}^{-1}(F_{\epsilon1,\delta}(x))=S_{c,1}(x)$の確認
+```{r,fig.width=7}
+epsilon1 <- c(0.25 , 0, -0.25)
+epsilon2 <- c(-0.5 ,  -1)
+parameters <- expand.grid(epsilon1=epsilon1,
+                          epsilon2=epsilon2)
+
+tmp_f <- function(x,delta,epsilon1,epsilon2){
+  qFas_conv(
+    dFas_conv_origin(x,delta = delta,epsilon = epsilon1),
+    delta = delta, epsilon = epsilon2
+  )
+}
+
+tmp_f2 <- function(x,epsilon1,epsilon2){
+  Sf_origin(x, epsilon = (epsilon1 - epsilon2)/1,
+            delta = 1)
+}
+
+ggplot(data=data.frame(X=c(0,rep(0,5),1)), aes(x=X))+
+  mapply(function(epsilon1,epsilon2,co)
+  stat_function(fun=tmp_f,
+                         size=1,
+                         n=1001,
+                         args=list(delta = 1,
+                                  epsilon1 = epsilon1,
+                                  epsilon2 = epsilon2),
+                aes_q(color=co),
+                linetype=2),
+  parameters$epsilon1,
+  parameters$epsilon2,
+  sprintf("epsilon1=%.2f epsilon2=%.2f",
+          parameters$epsilon1, parameters$epsilon2)
+  )+
+  mapply(function(epsilon1,epsilon2,co)
+  stat_function(fun=tmp_f2,
+                         size=1,
+                         n=1001,
+                         args=list(epsilon1 = epsilon1,
+                                  epsilon2 = epsilon2),
+                aes_q(color=co), alpha=0.5),
+  parameters$epsilon1,
+  parameters$epsilon2,
+  sprintf("epsilon1=%.2f epsilon2=%.2f",
+          parameters$epsilon1, parameters$epsilon2)
+  )+
+        theme_bw()+
+  guides(color=guide_legend(title="parameter"))+
+  theme(legend.position = "bottom")+
+  xlab("x")+ylab("y")
+
+```
+
+薄い方は、右辺。点線が左辺。  
+
+---
+
+分布(2)は、$|\epsilon|$の増加に伴って歪度の絶対値が増加する一方で、歪みの正の増加が$\epsilon$の負の値に対応するようにパラメータ化されていることに注意する。
+歪度の単調性についてのこの魅力的な結果は、
+分布族(2)における歪度の可能な範囲に対する限界を
+計算することを可能にする。
+Bowleyの歪度(例えば、Bowley、1937)が
+$$
+B_{\epsilon,\delta}\equiv\frac{Q_{\epsilon,\delta}(3/4)-2Q_{\epsilon,\delta}(1/2)+Q_{\epsilon,\delta}(1/4)}
+{Q_{\epsilon,\delta}(3/4)-Q_{\epsilon,\delta}(1/4)}
+$$
+この測定値は$\epslon$の中で単調であり、
+van Zwetの歪度の定義に従うので(Groeneveld and Meeden、1984)、
+通常、-1と1の間の任意の値を取ることができる。  
+これらは、$\epsilon\rightarrow \pm \infty,B_{\epsilon,\delta}\rightarrow\mp (k_{\delta}-1)/(k_{\delta}+1)$より簡単に確認できる。ここで、$k_{\delta}\equiv \exp(sinh^{-1}(\Phi(3/4))/\delta)\approx \exp(0.6316/\delta)$
+である
+
+---
+
+Bの確認
+```{r}
+delta <- seq(0.01,2,0.01)
+epsilon <- seq(-5 , 5, 0.1)
+
+parameters <- expand.grid(delta=delta,epsilon=epsilon)
+B <- function(delta,epsilon){
+  ( qFas_conv(3/4, epsilon = epsilon, delta = delta) - 
+    2 * qFas_conv(1/2, epsilon = epsilon, delta = delta) +
+    qFas_conv(1/4, epsilon = epsilon, delta = delta))/
+    ( qFas_conv(3/4, epsilon = epsilon, delta = delta) - 
+        qFas_conv(1/4, epsilon = epsilon, delta = delta))
+}
+
+tmp <- apply(parameters,1,function(x) B(delta=x[1],epsilon=x[2]))
+
+ggplot(data = data.frame(parameters, B = tmp)) +
+  geom_tile(aes(x=delta,y=epsilon,fill=B))+
+  theme_bw()+
+  scale_fill_gradient(low="blue", high="red")
+
+```
+
+なるほど。
+
+---
+
+周辺密度$f_{\epsilon,\delta}$を$\epsilon\rightarrow\pm\infty$でどうなるか確認することは可能である。
+具体的には、負の$\epsilon$(正の歪度)で作業し、
+限界密度$f_{-infty,\delta}$と呼ぶ。
+平均値と位置母数の適切な正規化を用いると、周辺密度は、$y>0$の範囲で
+$$
+f_{-\infty,\delta}=\frac{1}{\sqrt{2\pi}}\frac{\delta \cosh(\delta \log 2y)}{y}\exp\{-\frac{1}{2}\sinh^2(\delta\log 2y)\}
+$$
+
+これらは、$Y = exp（sinh）$の密度であり、
+ここでZは標準法線であり、
+$\delta$の値の範囲についてプロットする。
+
+```{r}
+delta <- data.frame(delta=c(0.5, 0.625, 0.75, 1, 1.5, 2, 5))
+
+tmp_f <- function(x, delta){
+  1/sqrt(2*pi)*(delta*cosh(delta*log(2*x)))/(x)*
+    exp(-1/2*sinh(delta*log(2*x))^2)
+}
+
+ggplot(data=data.frame(X=c(0,rep(0,5),1.5)), aes(x=X))+
+  mapply(function(delta)
+  stat_function(fun=tmp_f,
+                         size=1,
+                         n=1001,
+                         args=list(delta = delta),
+                aes_q(color=as.factor(delta))),
+                delta$delta)+
+        theme_bw()+
+  guides(color=guide_legend(title="delta"))+
+  theme(legend.position = "bottom")
+
+
+```
+
+
