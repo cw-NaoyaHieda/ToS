@@ -229,13 +229,6 @@ ggplot(plot_ES) +
   theme_bw()+
   facet_grid(level~.,scales = "free")+
   ggtitle("ES")
-
-ggplot(plot_para) +
-  geom_line(aes(x=dt,y=value,color=variable))+
-  theme_bw()+
-  facet_grid(variable~.,scales = "free")+
-  ggtitle("parameters")+
-  guides(colour=FALSE)
 ```
 
 ## 評価
@@ -254,6 +247,38 @@ eval_ES <- check_VaR * apply(result_ES[,-1],2,function(x) abs(df$log_x[c(251:len
 
 colMeans(eval_ES)
 ```
+
+
+
+## パラメータについて
+
+```{r}
+ggplot(plot_para) +
+  geom_line(aes(x=dt,y=value,color=variable))+
+  theme_bw()+
+  facet_grid(variable~.,scales = "free")+
+  ggtitle("parameters")+
+  guides(colour=FALSE)
+```
+
+deltaが急変化してる点はいつか
+```{r}
+result_para %>% mutate(diff_delta = c(diff(delta),0)) %>% 
+  filter(diff_delta == diff_delta %>% max())
+#sigmaでも一緒
+result_para %>% mutate(diff_sigma = c(diff(sigma),0)) %>% 
+  filter(diff_sigma == diff_sigma %>% max())
+```
+
+じゃあ、この日の株価が急変化しているかというと
+```{r}
+df[df$dt == "2017-11-14",]
+```
+そんなことはないので、推定に使用する範囲じゃなくなったデータを確認すると
+```{r}
+df[704-250,]
+```
+一応納得。
 
 
 
