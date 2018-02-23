@@ -3,8 +3,9 @@
 .RData
 .Ruserdata
 *.html
-<<<<<<< HEAD
 Afamiliyof/
-=======
 市場リスク_2018_cache/
->>>>>>> 9bb770e8639084c65b96923b575d5d30995fc39a
+Icon*
+rmd/fig/*
+rmd/*_cache/*
+rmd/*_files/*

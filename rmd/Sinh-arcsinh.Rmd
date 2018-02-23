@@ -142,7 +142,7 @@ dfas <- function(x, delta){
 }
 ```
 $f_{\epsilon,\delta}$の例は、下記のようになる。
-確認したが、上手いこと出ない(下に行ったら、変換した別の式があった)
+確認したが、上手いこと出ない(下に行ったら、(1)に関しては変換した別の式があった)
 ```{r}
 delta <- data.frame(delta=c(0.5, 0.625, 0.75, 1, 1.5, 2, 5))
 epsilon <- data.frame(epsilon=c(0, -0.25, -0.5, -0.75, -1))
@@ -586,9 +586,9 @@ $$
 f_{-\infty,\delta}=\frac{1}{\sqrt{2\pi}}\frac{\delta \cosh(\delta \log 2y)}{y}\exp\{-\frac{1}{2}\sinh^2(\delta\log 2y)\}
 $$
 
-これらは、$Y = exp（sinh）$の密度であり、
-ここでZは標準法線であり、
-$\delta$の値の範囲についてプロットする。
+これらは、$Y =\exp(\sinh^{-1}(Z)/\delta)/2$の密度であり、
+ここで$Z$は標準正規分布からの乱数であり、
+$\delta$を$(0.5, 0.625, 0.75, 1, 1.5, 2, 5)$に変化させてプロットする。
 
 ```{r}
 delta <- data.frame(delta=c(0.5, 0.625, 0.75, 1, 1.5, 2, 5))
@@ -612,5 +612,22 @@ ggplot(data=data.frame(X=c(0,rep(0,5),1.5)), aes(x=X))+
 
 
 ```
+
+(読者は、分布族のそれほど極端ではない分布(2)を最初に見ることを好むかもしれない。)
+図1(a)のすべての密度は、中央値1/2であることや、密度$f_{5,-\infty}$を見ると、tailが非常に薄く、歪みが少ないことをすぐに確認できる。 
+しかし、他のほとんどもそうである。 上記で決定された利用可能なskewの範囲に関連する
+制限は軽度に見える。
+$\delta$の尖度の役割についての同様の考察は、3.1節の対称サブ分布族の検討まで延期する。
+
+## Tailweight
+
+$|x|\rightarrow \infty$のとき、
+$S_{\epsilon,\delta}(x)\sim2^{\delta-1}sgn(x)exp(sgn(x)\epsilon)|x|^{2\delta}$かつ
+$C_{\epsilon,\delta}(x)\sim2^{\delta-1}exp(sgn(x)\epsilon)|x|^{\delta}$である。
+上記の式は、レートに影響を与えないにもかかわらず、漸近式に$\epsilon$の位置を保持し(他の定数は存在しない)
+$$
+f_{\epsilon,\delta}(|x|)\sim\exp(sgn(x)\epsilon)|x|^{\delta-1}\exp(-e^{sgn(x)2\epsilon}|x|^{2\delta}).\tag{`r EqnNum()`}
+$$
+
 
 
