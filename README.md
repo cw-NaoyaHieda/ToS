@@ -17,7 +17,10 @@ ToS/
 │     ├ nikkei225.csv(実験で使用していたデータ)  
 │     ├ nky.csv(概論のプロットと投稿論文用に先生に頂いたデータ)  
 │     ├ rolling_result.Rdata(ローリング推定の結果 オブジェクトresutlが入っている 特に工夫なし)  
-│     └ rolling_result_useolodpara.Rdata(ローリング推定の結果 オブジェクトresutlが入っている 一時点前のパラメータが推定の初期値)  
+│     ├ rolling_result_useolodpara.Rdata(ローリング推定の結果 一時点前のパラメータが推定の初期値)
+│     ├ rolling_result_locationshift.Rdata(ローリング推定の結果 上のデータのlocationshift)
+│     ├ rolling_result_useoldpara_weight.Rdata(ローリング推定の結果　一時点前のパラメータが推定の初期値+重み付き最尤推定)
+│     └ rolling_result_locationshift_weight.Rdata(ローリング推定の結果 上のデータのlocationshift)
 ├ rmd/  
 ├ old_rmd/
 │        ├ 20180209.Rmd(概論のプロットの一部出力用)  
