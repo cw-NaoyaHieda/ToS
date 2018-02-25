@@ -406,3 +406,5 @@ IS.fa_check_weigth <- function(){
   w25 <- w25 / sum(w25)
   w5 <- w5 / sum(w5)
   return( list(w1, w25, w5) ) }
+
+

@@ -342,9 +342,13 @@ result2<-foreach(i = 2:(length(df$log_x)-249), .combine='cbind') %dopar% {
   theta.val1<- find.theta(0.01, para)
   theta.val25<- find.theta(0.025, para)
   theta.val5<- find.theta(0.05, para)
-  rfa.IS.1<-rIS_SIR(n=20000, par=c(VaR.true.FA[1], para[2:4]), par2=VaR.true.FA[1], theta=theta.val1)
-  rfa.IS.25<-rIS_SIR(n=20000, par=c(VaR.true.FA[2], para[2:4]), par2=VaR.true.FA[2], theta=theta.val25)
-  rfa.IS.5<-rIS_SIR(n=20000, par=c(VaR.true.FA[3], para[2:4]), par2=VaR.true.FA[3], theta=theta.val5)
+  thetas <- c(theta.val1, theta.val25, theta.val5)
+  rfa.IS.1<-rIS_SIR2(n=20000, par=c(VaR.true.FA[1], para[2:4]),
+                     par2=c(VaR.true.FA[1], sd(rt)), theta=theta.val1)
+  rfa.IS.25<-rIS_SIR2(n=20000, par=c(VaR.true.FA[2], para[2:4]), 
+                      par2=c(VaR.true.FA[2], sd(rt)), theta=theta.val25)
+  rfa.IS.5<-rIS_SIR2(n=20000, par=c(VaR.true.FA[3], para[2:4]), 
+                     par2=c(VaR.true.FA[3], sd(rt)), theta=theta.val5)
   # サンプリングしたものを入力としてFA分布の重点サンプリングを行う
   rfa1 <- sample(rfa.IS.1$q, 10000)
   rfa25 <- sample(rfa.IS.25$q, 10000)
@@ -468,7 +472,7 @@ ggplot() +
   ggtitle("ES")
 ```
 
-ちょっと怪しいですね・・・
+1\%のVaRがちょっと怪しいですね・・・
 
 ## 評価
 
@@ -490,11 +494,23 @@ count2_VaR/ dim(check2_VaR)[1]
 count_VaR/ dim(check_VaR)[1]
 ```
 
-全く一緒でした・・・
+元のやつのほうが良さげです・・・
 
 ```{r}
 #ES?
 eval2_ES <- check2_VaR * apply(result2_ES[,-1],2,function(x) abs(df$log_x[c(251:length(df$dt))] - x)/ -x)
 
 colMeans(eval2_ES)
+```
+
+
+## パラメータについて(変更しているmu=VaRの真値を確認)
+
+```{r}
+ggplot(plot2_para) +
+  geom_line(aes(x=dt,y=value,color=variable))+
+  theme_bw()+
+  facet_grid(variable~.,scales = "free")+
+  ggtitle("parameters")+
+  guides(colour=FALSE)
 ```

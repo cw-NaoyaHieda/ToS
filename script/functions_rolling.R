@@ -163,7 +163,18 @@ rIS_SIR <- function(n, par, par2, theta){
   q.resample <- Resample1(q, weight=w, NofSample = n)
   list( q=q.resample, w=w)
 }
-
+# 重点分布(dfas2)からのサンプリング (fucntionsでの同じ関数は並列にしているので上書き)
+rIS_SIR2 <- function(n, par, par2){
+  ## 正規分布を提案分布に
+  q <- rnorm(n, mean=par2[1], sd=par2[2])
+  ## 重み
+  w <- sapply(q, 
+              dfas2, mu = par[1], sigma= par[2] , lambda=par[3], delta = par[4])/dnorm(q, mean=par2[1], sd=par2[2])
+  w <- w/sum(w)
+  ## resample
+  q.resample <- Resample1(q, weight=w, NofSample = n)
+  list( q=q.resample, w=w)
+}
 
 
 
@@ -249,4 +260,25 @@ IS.fa_pre <- function(){
   
   return(out = cbind(t(out1),t(out25),t(out5)))
   
+}
+
+# 局度変換を伴うsinh-arcsinh分布のパラメータ推定関数
+mle.dfas2_weight <- function(x, weight, ini){
+  # 対数尤度を計算する関数
+  # (最適化の際にパラメータに制約があると望ましくないので指数変換している)
+  # (Rの最適化関数が最小化を目指すので正負を入れ替えてある) 
+  obj <- function(par){
+    mu <- par[1]
+    sigma <- exp(par[2])
+    lambda <- par[3]
+    delta <-par[4]
+    lik <-  -sum(weight * log( dfas2(x, mu, sigma, lambda, delta)))
+    lik
+  }
+  # optimで上記の関数が最小になるパラメータiniを探してくれる
+  # BFGS法　興味のある人は自分で調べて
+  out <- optim( ini, obj, hessian=TRUE)
+  out$par2 <- out$par
+  out$par2[2] <- exp(out$par[2])
+  out
 }
