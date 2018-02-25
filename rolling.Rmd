@@ -102,16 +102,30 @@ str(df)
 # VaR,ESのローリング推定
 
 ```{r rollingB,eval=FALSE}
+IS.fa.outs <- c()
+IS.norm.outs <- c()
+SMC.fa.outs <- c()
+SMC.norm.outs <- c()
+
 cl <- makeCluster(detectCores()-1)  # クラスタの作成
-registerDoParallel(cl)  
-result<-foreach(i = 2:(length(df$log_x)-249), .combine='cbind') %dopar% {
+registerDoParallel(cl)
+cl_l <- detectCores()-1
+clusterExport(cl,list("s_inverse","dfas","dfas2","Cf","Sf","cl_l","rfa_SIR","Resample1"))
+result <- c()
+for(i in 2:(length(df$log_x)-249)){
   rt <- df$log_x[i:(i+249)]
   rt <- rt[rt!=0]
-  fit <- mle.dfas2(rt, ini=c(0, log(0.2), -0.2, 0.5))
-  rand.fa<-rfa_SIR(n=10000, mu=fit$par2[1],
-                   sigma = fit$par2[2],
-                   lambda = fit$par2[3],
-                   delta = fit$par2[4])
+  
+  first_parameter <- c(0, log(0.2), -0.2, 0.5)
+  if(i != 2){
+    first_parameter <- old_parameter
+  }
+  fit <- mle.dfas2(rt, ini=first_parameter)
+  clusterExport(cl,list("fit"))
+  rand.fa<-rfa_SIR_para(n=10000, mu=fit$par2[1],
+                        sigma = fit$par2[2],
+                        lambda = fit$par2[3],
+                        delta = fit$par2[4])
   #真値計算?
   #99%,97.5%,95%の各点に対して，先ほどの関数を用いて求める
   VaR1.fa <- qfas(0.01, mu=fit$par2[1], sigma=fit$par2[2],
@@ -121,17 +135,19 @@ result<-foreach(i = 2:(length(df$log_x)-249), .combine='cbind') %dopar% {
   VaR5.fa <- qfas(0.05, mu=fit$par2[1], sigma=fit$par2[2],
                   lambda=fit$par2[3], delta = fit$par2[4])
   VaR.true.FA <- c(VaR1.fa ,VaR25.fa ,VaR5.fa )
+  clusterExport(cl,list("VaR.true.FA"))
   #単純モンテカルロ
-  SMC.fa.out <- SMC.fa_pre(fit$par2)
+  SMC.fa.out <- SMC.fa_para_pre(fit$par2)
+  
   #--------------
   
   # 99%,97.5%,95%それぞれのVaRと平均が一致するthetaを取得
   theta.val1<- find.theta(0.01, fit$par2)
   theta.val25<- find.theta(0.025, fit$par2)
   theta.val5<- find.theta(0.05, fit$par2)
-  rfa.IS.1<-rIS_SIR(n=20000, par=fit$par2, par2=VaR.true.FA[1], theta=theta.val1)
-  rfa.IS.25<-rIS_SIR(n=20000, par=fit$par2, par2=VaR.true.FA[2], theta=theta.val25)
-  rfa.IS.5<-rIS_SIR(n=20000, par=fit$par2, par2=VaR.true.FA[3], theta=theta.val5)
+  rfa.IS.1<-rIS_SIR_para(n=20000, par=fit$par2, par2=VaR.true.FA[1], theta=theta.val1)
+  rfa.IS.25<-rIS_SIR_para(n=20000, par=fit$par2, par2=VaR.true.FA[2], theta=theta.val25)
+  rfa.IS.5<-rIS_SIR_para(n=20000, par=fit$par2, par2=VaR.true.FA[3], theta=theta.val5)
   # サンプリングしたものを入力としてFA分布の重点サンプリングを行う
   rfa1 <- sample(rfa.IS.1$q, 10000)
   rfa25 <- sample(rfa.IS.25$q, 10000)
@@ -149,18 +165,24 @@ result<-foreach(i = 2:(length(df$log_x)-249), .combine='cbind') %dopar% {
   SMC.norm.out <- SMC.norm_pre(theta)
   IS.norm.out <- IS.norm_pre(theta)
   
-  
-  c(i,IS.fa.out,IS.norm.out,SMC.fa.out,SMC.norm.out,fit$par2,mean(rt), sd(rt))
+  #IS.fa.outs <- rbind(IS.fa.outs,IS.fa.out)
+  #IS.norm.outs <- rbind(IS.norm.outs,IS.norm.out)
+  #SMC.fa.outs <- rbind(SMC.fa.outs,SMC.fa.out)
+  #SMC.norm.outs <- rbind(SMC.norm.outs,SMC.norm.out)
+  print(i)
+  result <- rbind(result,
+                   c(i, IS.fa.out,IS.norm.out,SMC.fa.out,SMC.norm.out,
+                     fit$par2,mean(rt), sd(rt)))
+  old_parameter <- fit$par2
 }
 
 stopCluster(cl)
-save(list=c("result"),file="data/rolling_result.Rdata")
+save(list=c("result"),file="data/rolling_result_useoldpara.Rdata")
 ```
 
 
 ```{r}
-load("data/rolling_result.Rdata")
-result <- t(result)
+load("data/rolling_result_useoldpara.Rdata")
 colnames(result) <- c("dt",
                       "IS_VaR_fa_0.01","IS_ES_fa_0.01",
                       "IS_VaR_fa_0.025","IS_ES_fa_0.025",
@@ -261,7 +283,9 @@ ggplot(plot_para) +
   guides(colour=FALSE)
 ```
 
-deltaが急変化してる点はいつか
+
+やはり、deltaが急変してしまう点がある。  
+一応はいつなのか確認。
 ```{r}
 result_para %>% mutate(diff_delta = c(diff(delta),0)) %>% 
   filter(diff_delta == diff_delta %>% max())
@@ -270,7 +294,9 @@ result_para %>% mutate(diff_sigma = c(diff(sigma),0)) %>%
   filter(diff_sigma == diff_sigma %>% max())
 ```
 
-じゃあ、この日の株価が急変化しているかというと
+前回と一緒。
+
+この日の株価が急変化しているかというと
 ```{r}
 df[df$dt == "2017-11-14",]
 ```

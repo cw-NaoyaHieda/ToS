@@ -66,6 +66,11 @@ Resample1 <- function(data, weight, NofSample){
   newdata <- data[ (st+1) ]
   return(newdata)
 }
+## IS for VaR
+Expected.val.th <- function(VaR, mu, sd){
+  #M <- exp(mu*th+ sd^2*th^2/2)
+  #m <- mu+sd^2*th
+  return( (VaR - mu)/sd^2 )}
 ## 正規分布を提案分布とした局度変換を伴うsinh-arcsinh分布の重点サンプリング
 rfa_SIR <- function(n, mu, sigma, lambda, delta)
 {
