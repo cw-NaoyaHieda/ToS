@@ -21,7 +21,7 @@ ToS/
 ├ rmd/  
 ├ old_rmd/
 │        ├ 20180209.Rmd(概論のプロットの一部出力用)  
-│       └ snow.Rmd(snowパッケージの性能確認rmd)  
+│        └ snow.Rmd(snowパッケージの性能確認rmd)  
 ├ plot/  
 │     ├ ES100_20180209.eps(100~10000での推定ESの挙動)  
 │     ├ logreturn_20180209.eps(nky.csvの対数収益率プロット)  
