@@ -36,31 +36,31 @@ ToS/
 └ ToS.Rproj  
 
 
-├── README.md
-├── ToS.Rproj
-├── data
-│   ├── nikkei225.csv
-│   ├── nky.csv
-│   ├── rolling_result.Rdata
-│   └── rolling_result_useoldpara.Rdata
-├── old_rmd
-│   ├── 20180209.Rmd
-│   └── snow.Rmd
-├── plot
-│   ├── ES100_20180209.eps
-│   ├── MLE_20180209.eps
-│   ├── logreturn_20180209.eps
-│   ├── n225_20180209.eps
-│   └── sinh-arcsinh_20180209.eps
-├── rmd
-│   ├── A family of skew distributions with mode-invariance through transformation of scale.Rmd
-│   └── Sinh-arcsinh.Rmd
-├── rolling.Rmd
-├── rolling.html
-├── script
-│   ├── 20180203.R
-│   ├── functions.R
-│   ├── functions_gaironplot.R
-│   ├── functions_rolling.R
-│   └── gaironplot.R
-└── toc.css
+├── README.md  
+├── ToS.Rproj  
+├── data  
+│   ├── nikkei225.csv  
+│   ├── nky.csv  
+│   ├── rolling_result.Rdata  
+│   └── rolling_result_useoldpara.Rdata  
+├── old_rmd  
+│   ├── 20180209.Rmd  
+│   └── snow.Rmd  
+├── plot  
+│   ├── ES100_20180209.eps  
+│   ├── MLE_20180209.eps  
+│   ├── logreturn_20180209.eps  
+│   ├── n225_20180209.eps  
+│   └── sinh-arcsinh_20180209.eps  
+├── rmd  
+│   ├── A family of skew distributions with mode-invariance through transformation of scale.Rmd  
+│   └── Sinh-arcsinh.Rmd  
+├── rolling.Rmd  
+├── rolling.html  
+├── script  
+│   ├── 20180203.R  
+│   ├── functions.R  
+│   ├── functions_gaironplot.R  
+│   ├── functions_rolling.R  
+│   └── gaironplot.R  
+└── toc.css  
