@@ -597,14 +597,14 @@ clusterExport(cl,c('s_inverse','dfas2','dfas','Cf','Sf',
 # 重点サンプリングの関数の関数も新しいものにした。
   f <- function(x, par, par2){
   #par2 f # par g
-    dfas2(x, mu=par2[1], sigma=par2[2],
-                       lambda=par2[3], delta=par2[4])/
     dfas2(x, mu=par[1], sigma=par[2],
-                       lambda=par2[3], delta=par2[4])}
+                       lambda=par[3], delta=par[4])/
+    dfas2(x, mu=par2[1], sigma=par[2],
+                       lambda=par[3], delta=par[4])}
   
   #weightを計算する
-  w1 <- c(f(rfa1, par = fit$par2, par2=c(mu.val5, fit$par2[2:4])))
-  w25 <- f(rfa25, par = fit$par2, par2=c(mu.val5, fit$par2[2:4]))
+  w1 <- f(rfa1, par = fit$par2, par2=c(mu.val1, fit$par2[2:4]))
+  w25 <- f(rfa25, par = fit$par2, par2=c(mu.val25, fit$par2[2:4]))
   w5 <- f(rfa5, par = fit$par2, par2=c(mu.val5, fit$par2[2:4]))
 
   
@@ -624,7 +624,7 @@ clusterExport(cl,c('s_inverse','dfas2','dfas','Cf','Sf',
     # 累積和が0.01に一番近いサンプルが99%VaR
     v1 <- A[which.min(abs(A[,3]-0.01)),1]
     # v1までのサンプルからES0.01の推定値を求める
-    if(is.null(dim(A[which.min(abs(A[,3]-0.01)),]))){
+    if(is.null(dim(A[1:which.min(abs(A[,3]-0.01)),]))){
     es1 <- sum(prod(A[1:which.min(abs(A[,3]-0.01)),c(1:2)]))/0.01
   }else{
     es1 <- sum(apply(A[1:which.min(abs(A[,3]-0.01)),1:2],1,prod))/0.01
@@ -640,7 +640,7 @@ clusterExport(cl,c('s_inverse','dfas2','dfas','Cf','Sf',
     A <- out1[sort.list(out1[,1]),]
     A <- cbind(A, cumsum(A[,2]))
     v1<-A[which.min(abs(A[,3]-0.025)),1]
-    if(is.null(dim(A[which.min(abs(A[,3]-0.025)),]))){
+    if(is.null(dim(A[1:which.min(abs(A[,3]-0.025)),]))){
     es1 <- sum(prod(A[1:which.min(abs(A[,3]-0.025)),c(1:2)]))/0.025
   }else{
     es1<- sum(apply(A[1:which.min(abs(A[,3]-0.025)),1:2],1,prod))/0.025
@@ -658,22 +658,127 @@ clusterExport(cl,c('s_inverse','dfas2','dfas','Cf','Sf',
     A <- out1[sort.list(out1[,1]),]
     A <- cbind(A, cumsum(A[,2]))
     v1<-A[which.min(abs(A[,3]-0.05)),1]
-    if(is.null(dim(A[which.min(abs(A[,3]-0.05)),]))){
+    if(is.null(dim(A[1:which.min(abs(A[,3]-0.05)),]))){
     es1 <- sum(prod(A[1:which.min(abs(A[,3]-0.05)),c(1:2)]))/0.05
   }else{
     es1<- sum(apply(A[1:which.min(abs(A[,3]-0.05)),1:2],1,prod))/0.05
   }
     return(c(v1, es1))})
   
-  #matplot(t(out5),type="l")
-  #abline(h=VaR.true.FA[3],col=1)
-  #abline(h=ES.true.FA[3],col=2)
+  matplot(t(out5),type="l")
+  abline(h=VaR.true.FA[3],col=1)
+  abline(h=ES.true.FA[3],col=2)
 
 
 stopCluster(cl)
 ```
 
-正直微妙かと・・・  
+```{r}
+out1[,c(901,9901)]
+out25[,c(901,9901)]
+out5[,c(901,9901)]
+VaR.true.FA
+ES.true.FA
+```
+
+塩濱先生のコードが通らなかった理由は、w1,w25,w5が,対応するサンプルxの一番小さい数字に対して  
+大きい値を取っており、データが一個しか該当せず(つまり、一番小さい数字が推定VaR)、ESの計算のapplyでエラーしていました。
+
+```{r}
+summary(w1)
+summary(w25)
+summary(w5)
+```
+
+### その点を踏まえて、weightを基準化してみる
+
+実験の際に、重点サンプリングで、基準化するのはおかしいという話でしたが、一回やってみます
+
+
+```{r}
+cl <- makeCluster(detectCores()-1)  # クラスタの作成
+clusterExport(cl,c('s_inverse','dfas2','dfas','Cf','Sf',
+                     'rfa1','rfa25','rfa5'))  
+# 重点サンプリングの関数の関数も新しいものにした。
+  f <- function(x, par, par2){
+  #par2 f # par g
+    dfas2(x, mu=par[1], sigma=par[2],
+                       lambda=par[3], delta=par[4])/
+    dfas2(x, mu=par2[1], sigma=par[2],
+                       lambda=par[3], delta=par[4])}
+  
+  #weightを計算する
+  w1 <- c(f(rfa1, par = fit$par2, par2=c(mu.val1, fit$par2[2:4])))
+  w25 <- f(rfa25, par = fit$par2, par2=c(mu.val25, fit$par2[2:4]))
+  w5 <- f(rfa5, par = fit$par2, par2=c(mu.val5, fit$par2[2:4]))
+  
+  
+  N <-10000
+  #hosts <- rep('localhost',12)
+  #hosts <- 7
+  #cl <- makeCluster(hosts, "SOCK")
+  clusterExport(cl,c('w1','w25','w5'))  
+  #99%点での計算 100~10000までサンプル数を増やして行う
+  out1<- parSapply(cl, 100:N, function(x){
+    # サンプルの対応するweightをくっつける
+    out1<-cbind(rfa1[1:x],  w1[1:x]/sum(w1[1:x]))
+    # サンプルの小さい順にならべかえる
+    A <- out1[sort.list(out1[,1]),]
+    # weightの累積和を並べる
+    A <- cbind(A, cumsum(A[,2]))
+    # 累積和が0.01に一番近いサンプルが99%VaR
+    v1 <- A[which.min(abs(A[,3]-0.01)),1]
+    # v1までのサンプルからES0.01の推定値を求める
+    if(is.null(dim(A[1:which.min(abs(A[,3]-0.01)),]))){
+    es1 <- sum(prod(A[1:which.min(abs(A[,3]-0.01)),c(1:2)]))/0.01
+  }else{
+    es1 <- sum(apply(A[1:which.min(abs(A[,3]-0.01)),1:2],1,prod))/0.01
+  }
+    return(c(v1, es1))})
+  
+  matplot(t(out1),type="l")
+  abline(h=VaR.true.FA[1],col=1)
+  abline(h=ES.true.FA[1],col=2)
+  
+  out25<-parSapply(cl, 100:N, function(x){
+    out1<-cbind( rfa25[1:x],  w25[1:x]/sum(w25[1:x]))
+    A <- out1[sort.list(out1[,1]),]
+    A <- cbind(A, cumsum(A[,2]))
+    v1<-A[which.min(abs(A[,3]-0.025)),1]
+    if(is.null(dim(A[1:which.min(abs(A[,3]-0.025)),]))){
+    es1 <- sum(prod(A[1:which.min(abs(A[,3]-0.025)),c(1:2)]))/0.025
+  }else{
+    es1<- sum(apply(A[1:which.min(abs(A[,3]-0.025)),1:2],1,prod))/0.025
+  }
+    return(c(v1, es1))})
+  
+  matplot(t(out25),type="l")
+  abline(h=VaR.true.FA[2],col=1)
+  abline(h=ES.true.FA[2],col=2)
+  
+
+  
+  out5<-parSapply(cl, 100:N, function(x){
+    out1<-cbind( rfa5[1:x],  w5[1:x]/sum(w5[1:x]))
+    A <- out1[sort.list(out1[,1]),]
+    A <- cbind(A, cumsum(A[,2]))
+    v1<-A[which.min(abs(A[,3]-0.05)),1]
+    if(is.null(dim(A[1:which.min(abs(A[,3]-0.05)),]))){
+    es1 <- sum(prod(A[1:which.min(abs(A[,3]-0.05)),c(1:2)]))/0.05
+  }else{
+    es1<- sum(apply(A[1:which.min(abs(A[,3]-0.05)),1:2],1,prod))/0.05
+  }
+    return(c(v1, es1))})
+  
+  matplot(t(out5),type="l")
+  abline(h=VaR.true.FA[3],col=1)
+  abline(h=ES.true.FA[3],col=2)
+
+
+stopCluster(cl)
+```
+
+うーーん、やっぱりこれは違うみたいです。。
 
 ## 時系列版
 
