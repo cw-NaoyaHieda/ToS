@@ -673,16 +673,40 @@ clusterExport(cl,c('s_inverse','dfas2','dfas','Cf','Sf',
 stopCluster(cl)
 ```
 
+#### 評価
+
+
 ```{r}
-out1[,c(901,9901)]
-out25[,c(901,9901)]
-out5[,c(901,9901)]
+print("1000 sample")
+X <- data.frame(estimate0.01=out1[,c(901)],estimate0.025=out25[,c(901)],
+                estimate0.05=out5[,c(901)])
+rownames(X) <- c("VaR","ES")
+X
+print("10000 sample")
+X <- data.frame(estimate0.01=out1[,c(9901)],estimate0.025=out25[,c(9901)],
+                estimate0.05=out5[,c(9901)])
+rownames(X) <- c("VaR","ES")
+X
 VaR.true.FA
 ES.true.FA
 ```
 
+
+実験の場合の結果(N=1000)  
+Trueとしている分布が違うので、参考までに
+
+|         |VaR99|   VaR97.5|      ES95|    ES97.5|
+|---|---|---|---|---|
+|True |-4.270542| -3.200204| -5.434657 |-4.366513|
+|IS   |-4.269704| -3.197846| -5.429114| -4.364618|
+|SMC  |-4.206894| -3.213699 |-5.383157| -4.363356|
+
+
 塩濱先生のコードが通らなかった理由は、w1,w25,w5が,対応するサンプルxの一番小さい数字に対して  
 大きい値を取っており、データが一個しか該当せず(つまり、一番小さい数字が推定VaR)、ESの計算のapplyでエラーしていました。
+
+上から0.01から0.05のweightの値
+
 
 ```{r}
 summary(w1)
