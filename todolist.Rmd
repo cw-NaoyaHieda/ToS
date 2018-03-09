@@ -1,0 +1,48 @@
+---
+title: "to do list"
+author: "Naoya Hieda"
+date: "2018-02-09"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+    number_sections: yes
+    css: "toc.css"
+    code_folding: hide
+    toc_depth: 2
+    pandoc_args: [
+        "--from", "markdown+autolink_bare_uris+tex_math_single_backslash-implicit_figures"
+        ]
+---
+
+
+
+```{r knitr_init, echo=FALSE, cache=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=TRUE,
+	             prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE,
+               fig.width=6,
+               fig.height=4)
+opts_knit$set(width=75)
+set.seed(2017)
+```
+
+
+|内容1|内容2|進捗状況|備考|
+|--------------------|--------------------|----|----------|
+|論文の理解|Sinh-arcsinh distributions: a broad family giving rise to powerful tests of normality and symmetryの理解|△||
+||A family of skew distributions with mode-invariance through transformation of scaleの理解|△|日本語訳は終了|
+|論文作成|塩濱先生の書いてくださった論文の英訳|△||
+|時系列で分布のパラメータ推定|(工夫なし)|◯||
+||パラメータの最適化での初期値を前回の値にする|◯|意味なし|
+||weight付きでの推定|◯|今の所、一番よさげ|
+|ES.VaRのローリング推定|実験の方法|◯|パラメータ推定ありきの結果|
+||モードシフトでのIS|△||
+|||||

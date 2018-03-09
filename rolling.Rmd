@@ -14,6 +14,8 @@ output:
         ]
 ---
 
+[更新されたのはここ](#newpage)
+
 
 ```{r knitr_init, echo=FALSE, cache=FALSE}
 library(knitr)
@@ -491,10 +493,190 @@ colMeans(eval3_ES)
 
 結構良さげですね
 
+
+## lambda=0なら初期値を0にして最適化
+
+
+```{r rolling_wegiht2,eval=FALSE}
+IS.fa.outs <- c()
+IS.norm.outs <- c()
+SMC.fa.outs <- c()
+SMC.norm.outs <- c()
+
+cl <- makeCluster(detectCores()-1)  # クラスタの作成
+registerDoParallel(cl)
+cl_l <- detectCores()-1
+clusterExport(cl,list("s_inverse","dfas","dfas2","Cf","Sf","cl_l","rfa_SIR","Resample1"))
+result3 <- c()
+for(i in 2:(length(df$log_x)-249)){
+  rt <- df$log_x[i:(i+249)]
+  rt <- rt[rt!=0]
+  
+  first_parameter <- c(0, log(0.2), -0.2, 0.5)
+  if(i != 2){
+    first_parameter <- old_parameter
+  }
+  
+  mle_w <- seq(0.01, 1, 0.99/249)
+  fit <- mle.dfas2_weight(x = rt, weight =  mle_w, ini = first_parameter)
+  if(fit$par2[3]==0){
+    fit <- mle.dfas2_weight(x = rt, weight =  mle_w, ini = first_parameter)
+  }
+  clusterExport(cl,list("fit"))
+  rand.fa<-rfa_SIR_para(n=10000, mu=fit$par2[1],
+                        sigma = fit$par2[2],
+                        lambda = fit$par2[3],
+                        delta = fit$par2[4])
+  #真値計算?
+  #99%,97.5%,95%の各点に対して，先ほどの関数を用いて求める
+  VaR1.fa <- qfas(0.01, mu=fit$par2[1], sigma=fit$par2[2],
+                  lambda=fit$par2[3], delta = fit$par2[4])
+  VaR25.fa <- qfas(0.025, mu=fit$par2[1], sigma=fit$par2[2],
+                   lambda=fit$par2[3], delta = fit$par2[4])
+  VaR5.fa <- qfas(0.05, mu=fit$par2[1], sigma=fit$par2[2],
+                  lambda=fit$par2[3], delta = fit$par2[4])
+  VaR.true.FA <- c(VaR1.fa ,VaR25.fa ,VaR5.fa )
+  clusterExport(cl,list("VaR.true.FA"))
+  
+  #--------------
+  
+  # 99%,97.5%,95%それぞれのVaRと平均が一致するthetaを取得
+  theta.val1<- find.theta(0.01, fit$par2)
+  theta.val25<- find.theta(0.025, fit$par2)
+  theta.val5<- find.theta(0.05, fit$par2)
+  rfa.IS.1<-rIS_SIR_para(n=20000, par=fit$par2, par2=VaR.true.FA[1], theta=theta.val1)
+  rfa.IS.25<-rIS_SIR_para(n=20000, par=fit$par2, par2=VaR.true.FA[2], theta=theta.val25)
+  rfa.IS.5<-rIS_SIR_para(n=20000, par=fit$par2, par2=VaR.true.FA[3], theta=theta.val5)
+  # サンプリングしたものを入力としてFA分布の重点サンプリングを行う
+  rfa1 <- sample(rfa.IS.1$q, 10000)
+  rfa25 <- sample(rfa.IS.25$q, 10000)
+  rfa5 <- sample(rfa.IS.5$q, 10000)
+  #clusterExport(cl,list("rfa1","rfa25","rfa5"))
+  IS.fa.out <- NULL
+  #重点サンプリング
+  while(is.null(IS.fa.out)){
+    try(IS.fa.out <- IS.fa_pre())
+  }
+  
+  #-------
+  
+  #IS.fa.outs <- rbind(IS.fa.outs,IS.fa.out)
+  #IS.norm.outs <- rbind(IS.norm.outs,IS.norm.out)
+  #SMC.fa.outs <- rbind(SMC.fa.outs,SMC.fa.out)
+  #SMC.norm.outs <- rbind(SMC.norm.outs,SMC.norm.out)
+  print(i)
+  result3 <- rbind(result3,
+                   c(i, IS.fa.out, fit$par2))
+  old_parameter <- fit$par2
+}
+
+stopCluster(cl)
+save(list=c("result3"),file="data/rolling_result_useoldpara_weight_lambdashift.Rdata")
+```
+
+```{r}
+load("data/rolling_result_useoldpara_weight_lambdashift.Rdata")
+colnames(result3) <- c("dt",
+                      "IS_VaR_fa_0.01","IS_ES_fa_0.01",
+                      "IS_VaR_fa_0.025","IS_ES_fa_0.025",
+                      "IS_VaR_fa_0.05","IS_ES_fa_0.05",
+                      "mu","sigma","lambda","delta")
+
+result3_VaR <- result3[,c(1,2,4,6)] %>% data.frame()
+
+result3_ES <- result3[,c(1,3,5,7)]  %>% data.frame()
+
+result3_para <- result3[,c(1, 8, 9, 10, 11)]  %>% data.frame()
+```
+
+```{r }
+result3_VaR$dt <- df$dt[c(251:length(df$dt))]
+result3_ES$dt <- df$dt[c(251:length(df$dt))]
+result3_para$dt <- df$dt[c(251:length(df$dt))]
+plot3_VaR <- result3_VaR %>% data.frame() %>% melt(id="dt")
+plot3_ES <- result3_ES %>% data.frame() %>% melt(id="dt")
+plot3_para <- result3_para %>% data.frame() %>% melt(id="dt")
+
+plot3_VaR$level <- apply(plot3_VaR,1,function(x) substr(x["variable"],
+                                    regexpr("0.0", x["variable"]),
+                                    nchar(x["variable"])))
+
+plot3_VaR$method <- apply(plot3_VaR,1,function(x)
+  paste(strsplit(x["variable"][1] %>% as.character(),"_")[[1]][1],
+             strsplit(x["variable"] %>% as.character(),"_")[[1]][3]," weight")
+  )
+
+
+plot3_ES$level <- apply(plot3_ES,1,function(x) substr(x["variable"],
+                                    regexpr("0.0", x["variable"]),
+                                    nchar(x["variable"])))
+
+plot3_ES$method <- apply(plot3_ES,1,function(x)
+  paste(strsplit(x["variable"][1] %>% as.character(),"_")[[1]][1],
+             strsplit(x["variable"] %>% as.character(),"_")[[1]][3]," weight")
+  )
+
+ggplot() +
+  geom_line(data=plot3_VaR,
+    aes(x=dt,y=value,colour=method)) +
+  geom_line(data=plot_VaR,
+    aes(x=dt,y=value,colour=method)) +
+  geom_line(data=df[c(252:length(df$dt)),],
+            aes(x=dt,y=log_x))+
+  facet_grid(level~.,scales = "free")+
+  theme_bw()+
+  ggtitle("VaR and log return")
+
+ggplot() +
+  geom_line(data=plot3_VaR,
+    aes(x=dt,y=-value,colour=method)) +
+  geom_line(data=plot_VaR,
+    aes(x=dt,y=-value,colour=method)) +
+  facet_grid(level~.,scales = "free")+
+  theme_bw()+
+  ggtitle("VaR")
+
+ggplot() +
+  geom_line(data = plot3_ES,aes(x=dt,y=-value,colour=method))+
+  geom_line(data = plot_ES,aes(x=dt,y=-value,colour=method))+
+  theme_bw()+
+  facet_grid(level~.,scales = "free")+
+  ggtitle("ES")
+```
+
+
+```{r}
+ggplot(plot_para) +
+  geom_line(aes(x=dt,y=value,color=variable))+
+  theme_bw()+
+  facet_grid(variable~.,scales = "free")+
+  ggtitle("parameters")+
+  guides(colour=FALSE)
+```
+
+## 評価
+
+```{r}
+#VaR
+check3_VaR <- apply(data.frame(df$log_x[251:length(df$log_x)], -result3_VaR[,-1]), 1,
+      function(x) x[1] > x[-1]) %>% t()
+
+count3_VaR <- colSums(check3_VaR)
+print("Check count over Estimate VaR")
+print("weight var")
+count3_VaR/ dim(check3_VaR)[1]
+
+#ES?
+eval3_ES <- check3_VaR * apply(result3_ES[,-1],2,function(x) abs(df$log_x[c(251:length(df$dt))] - x)/ -x)
+print("normal var")
+colMeans(eval3_ES)
+```
+
+
+
 # ロケーションシフト
 
 ## サンプル数を増やした場合
-
 
 ### 下準備(全期間のデータに対する変数の準備)
 
@@ -525,7 +707,7 @@ makeclusterをいちいちやると、その度に時間がかかるので、cha
 cl <- makeCluster(detectCores()-1)  # クラスタの作成
 clusterExport(cl,c('s_inverse','dfas2','dfas','Cf','Sf'))
 
-  
+
 mu.val1 <- VaR.true.FA[1]
 mu.val25 <- VaR.true.FA[2]
 mu.val5 <- VaR.true.FA[3]
@@ -683,10 +865,10 @@ X <- data.frame(estimate0.01=out1[,c(901)],estimate0.025=out25[,c(901)],
 rownames(X) <- c("VaR","ES")
 X
 print("10000 sample")
-X <- data.frame(estimate0.01=out1[,c(9901)],estimate0.025=out25[,c(9901)],
+X1 <- data.frame(estimate0.01=out1[,c(9901)],estimate0.025=out25[,c(9901)],
                 estimate0.05=out5[,c(9901)])
-rownames(X) <- c("VaR","ES")
-X
+rownames(X1) <- c("VaR","ES")
+X1
 VaR.true.FA
 ES.true.FA
 ```
@@ -803,6 +985,357 @@ stopCluster(cl)
 ```
 
 うーーん、やっぱりこれは違うみたいです。。
+
+
+### どのサンプルにどれくらいのweightがついているか
+
+1\%
+
+```{r}
+rfa1_w <- cbind(rfa1,w1)
+rfa1_w[min(rfa1)==rfa1,][1,]
+dfas2( rfa1_w[min(rfa1)==rfa1,1],
+      mu = fit$par2[1],sigma = fit$par2[2],
+      lambda = fit$par2[3],delta = fit$par2[4])[1]
+```
+
+2.5\%
+
+```{r}
+rfa25_w <- cbind(rfa25,w25)
+rfa25_w[min(rfa25)==rfa25,][1,]
+dfas2( rfa25_w[min(rfa25)==rfa25,1],
+      mu = fit$par2[1],sigma = fit$par2[2],
+      lambda = fit$par2[3],delta = fit$par2[4])[1]
+```
+
+5\%
+```{r}
+rfa5_w <- cbind(rfa5,w5)
+rfa5_w[min(rfa5)==rfa5,][1,]
+dfas2( rfa5_w[min(rfa5)==rfa5,1],
+      mu = fit$par2[1],sigma = fit$par2[2],
+      lambda = fit$par2[3],delta = fit$par2[4])[1]
+```
+
+基本、1つか2つのサンプルで推定が終了してしまう。
+
+重点サンプリングのカーブを確認してみる
+
+実際の分布
+
+```{r}
+ggplot(data=data.frame(x=c(-6,-3)),aes(x=x))+
+  stat_function(fun = dfas2,
+                args = list(mu = fit$par2[1],sigma = fit$par2[2],
+                            lambda = fit$par2[3],delta = fit$par2[4]))+
+  theme_bw()
+```
+
+サンプリングに用いている分布
+
+この分布のdensityが低い?(1~あってほしい?)
+
+```{r}
+ggplot(data=data.frame(x=c(-6,-1)),aes(x=x))+
+  stat_function(fun = dfas2,
+                aes(color="0.01"),
+                args = list(mu = mu.val1,sigma = fit$par2[2],
+                            lambda = fit$par2[3],delta = fit$par2[4]))+
+  stat_function(fun = dfas2,
+                aes(color="0.025"),
+                args = list(mu = mu.val25,sigma = fit$par2[2],
+                            lambda = fit$par2[3],delta = fit$par2[4]))+
+  stat_function(fun = dfas2,
+                aes(color="0.05"),
+                args = list(mu = mu.val5,sigma = fit$par2[2],
+                            lambda = fit$par2[3],delta = fit$par2[4]))+
+  theme_bw()
+```
+
+重点分布
+
+```{r}
+ggplot(data=data.frame(x=c(-10,-2.5)),aes(x=x))+
+  stat_function(fun = f,
+                aes(color="0.01"),
+                args = list(par=fit$par2,
+                            par2=c(mu.val1,fit$par2[2:4])))+
+  stat_function(fun = f,
+                aes(color="0.025"),
+                args = list(par=fit$par2,
+                            par2=c(mu.val25,fit$par2[2:4])))+
+  stat_function(fun = f,
+                aes(color="0.05"),
+                args = list(par=fit$par2,
+                            par2=c(mu.val5,fit$par2[2:4])))+
+  theme_bw()
+```
+
+
+サンプルと重ね合わせてみる
+
+1\%
+
+```{r}
+qplot(rfa1, geom = "blank") + 
+  geom_histogram(aes(y= ..density..))+
+  stat_function(data=data.frame(x=c(-6,-1)),
+                fun = f,
+                aes(color="0.01",x=x),
+                args = list(par=fit$par2,
+                            par2=c(mu.val1,fit$par2[2:4])))+
+  xlim(c(-8,-4))+
+  theme_bw()
+```
+
+サンプリング分布をもっとtail寄りにすればいい?
+
+```{r}
+qplot(rfa1, geom = "blank") + 
+  geom_histogram(aes(y= ..density..))+
+  stat_function(data=data.frame(x=c(-6,-1)),
+                fun = f,
+                aes(color="0.01",x=x),
+                args = list(par=fit$par2,
+                            par2=c(mu.val1-0.5,fit$par2[2:4])))+
+  xlim(c(-8,-4))+
+  theme_bw()
+```
+
+
+・・・というか、meanをESの理論値にした方がいい気がしてきました。
+
+### meanをES にしてみて全期間
+
+
+```{r}
+cl <- makeCluster(detectCores()-1)  # クラスタの作成
+clusterExport(cl,c('s_inverse','dfas2','dfas','Cf','Sf'))
+
+  
+mu.val1 <- ES.true.FA[1]
+mu.val25 <- ES.true.FA[2]
+mu.val5 <- ES.true.FA[3]
+
+
+
+# 密度関数の確認
+dx <- seq(-10,5,length=200)
+out1 <- sapply(dx, dfas2, mu = mu.val1, sigma= fit$par2[2] ,
+               lambda=fit$par2[3], delta = fit$par2[4])
+out25 <- sapply(dx, dfas2, mu = mu.val25, sigma= fit$par2[2] ,
+                lambda=fit$par2[3], delta = fit$par2[4])
+out5 <- sapply(dx, dfas2, mu = mu.val5, sigma= fit$par2[2] ,
+               lambda=fit$par2[3], delta = fit$par2[4])
+out <- cbind(out1,out25,out5)
+  ### 次の関数を新しく用意した。
+  rIS_SIR2_ <- function(n, par, par2){
+  ## 正規分布を提案分布に par2 = c( mu, sigma) 
+  q <- rnorm(n, mean=par2[1], sd=par2[2])
+  ## 重み
+  #hosts <- rep('localhost',12)
+  #hosts <- 7
+  #cl <- makeCluster(hosts, "SOCK")
+  w <- parSapply(cl,q, 
+                 dfas2, mu = par[1], sigma= par[2] , lambda=par[3], delta = par[4]
+                 )/dnorm(q, mean=par2[1], sd=par2[2])
+  w <- w/sum(w)
+  ## resample
+  q.resample <- Resample1(q, weight=w, NofSample = n)
+  list( q=q.resample, w=w)
+  }
+  
+ rfa.IS.1<-rIS_SIR2_(n=20000, par=c( mu.val1, fit$par2[2:4]),
+                                 par2 = c(mu.val1, sd(rt))) 
+
+rfa.IS.25<-rIS_SIR2_(n=20000, par=c( mu.val25, fit$par2[2:4]),
+                                 par2 = c(mu.val25, sd(rt))) 
+
+rfa.IS.5<-rIS_SIR2_(n=20000, par=c( mu.val5, fit$par2[2:4]),
+                                 par2 = c(mu.val5, sd(rt))) 
+
+rfa1 <- sample(rfa.IS.1$q, 10000)
+rfa25 <- sample(rfa.IS.25$q, 10000)
+rfa5 <- sample(rfa.IS.5$q, 10000)
+
+clusterExport(cl,c('s_inverse','dfas2','dfas','Cf','Sf',
+                     'rfa1','rfa25','rfa5'))  
+# 重点サンプリングの関数の関数も新しいものにした。
+  f <- function(x, par, par2){
+  #par2 f # par g
+    dfas2(x, mu=par[1], sigma=par[2],
+                       lambda=par[3], delta=par[4])/
+    dfas2(x, mu=par2[1], sigma=par[2],
+                       lambda=par[3], delta=par[4])}
+  
+  #weightを計算する
+  w1 <- f(rfa1, par = fit$par2, par2=c(mu.val1, fit$par2[2:4]))
+  w25 <- f(rfa25, par = fit$par2, par2=c(mu.val25, fit$par2[2:4]))
+  w5 <- f(rfa5, par = fit$par2, par2=c(mu.val5, fit$par2[2:4]))
+
+  
+  N <-10000
+  #hosts <- rep('localhost',12)
+  #hosts <- 7
+  #cl <- makeCluster(hosts, "SOCK")
+  clusterExport(cl,c('w1','w25','w5'))  
+  #99%点での計算 100~10000までサンプル数を増やして行う
+  out1<- parSapply(cl, 100:N, function(x){
+    # サンプルの対応するweightをくっつける
+    out1<-cbind(rfa1[1:x],  w1[1:x]/x)
+    # サンプルの小さい順にならべかえる
+    A <- out1[sort.list(out1[,1]),]
+    # weightの累積和を並べる
+    A <- cbind(A, cumsum(A[,2]))
+    # 累積和が0.01に一番近いサンプルが99%VaR
+    v1 <- A[which.min(abs(A[,3]-0.01)),1]
+    # v1までのサンプルからES0.01の推定値を求める
+    if(is.null(dim(A[1:which.min(abs(A[,3]-0.01)),]))){
+    es1 <- sum(prod(A[1:which.min(abs(A[,3]-0.01)),c(1:2)]))/0.01
+  }else{
+    es1 <- sum(apply(A[1:which.min(abs(A[,3]-0.01)),1:2],1,prod))/0.01
+  }
+    return(c(v1, es1))})
+  
+  matplot(t(out1),type="l")
+  abline(h=VaR.true.FA[1],col=1)
+  abline(h=ES.true.FA[1],col=2)
+  
+  out25<-parSapply(cl, 100:N, function(x){
+    out1<-cbind( rfa25[1:x],  w25[1:x]/x)
+    A <- out1[sort.list(out1[,1]),]
+    A <- cbind(A, cumsum(A[,2]))
+    v1<-A[which.min(abs(A[,3]-0.025)),1]
+    if(is.null(dim(A[1:which.min(abs(A[,3]-0.025)),]))){
+    es1 <- sum(prod(A[1:which.min(abs(A[,3]-0.025)),c(1:2)]))/0.025
+  }else{
+    es1<- sum(apply(A[1:which.min(abs(A[,3]-0.025)),1:2],1,prod))/0.025
+  }
+    return(c(v1, es1))})
+  
+  matplot(t(out25),type="l")
+  abline(h=VaR.true.FA[2],col=1)
+  abline(h=ES.true.FA[2],col=2)
+  
+
+  
+  out5<-parSapply(cl, 100:N, function(x){
+    out1<-cbind( rfa5[1:x],  w5[1:x]/x)
+    A <- out1[sort.list(out1[,1]),]
+    A <- cbind(A, cumsum(A[,2]))
+    v1<-A[which.min(abs(A[,3]-0.05)),1]
+    if(is.null(dim(A[1:which.min(abs(A[,3]-0.05)),]))){
+    es1 <- sum(prod(A[1:which.min(abs(A[,3]-0.05)),c(1:2)]))/0.05
+  }else{
+    es1<- sum(apply(A[1:which.min(abs(A[,3]-0.05)),1:2],1,prod))/0.05
+  }
+    return(c(v1, es1))})
+  
+  matplot(t(out5),type="l")
+  abline(h=VaR.true.FA[3],col=1)
+  abline(h=ES.true.FA[3],col=2)
+
+
+stopCluster(cl)
+```
+
+
+#### 評価
+
+
+```{r}
+print("1000 sample")
+X2 <- data.frame(estimate0.01=out1[,c(901)],estimate0.025=out25[,c(901)],
+                estimate0.05=out5[,c(901)])
+rownames(X2) <- c("VaR_useES","ES_useES")
+rownames(X) <- c("VaR_useVaR","ES_useVaR")
+rbind(X2,X,VaR.true=VaR.true.FA,ES.true=ES.true.FA)[c(1,3,5,2,4,6),]
+
+
+print("10000 sample")
+X3 <- data.frame(estimate0.01=out1[,c(9901)],estimate0.025=out25[,c(9901)],
+                estimate0.05=out5[,c(9901)])
+rownames(X3) <- c("VaR","ES")
+rownames(X3) <- c("VaR_useES","ES_useES")
+rownames(X1) <- c("VaR_useVaR","ES_useVaR")
+rbind(X3,X1,VaR.true=VaR.true.FA,ES.true=ES.true.FA)[c(1,3,5,2,4,6),]
+```
+
+
+どっちがいいか・・・微妙ですね。次はばらつきまで見てみます。
+
+<a name="newpage"></a>
+
+#### ばらつきまでみる
+
+
+```{r, eval=FALSE}
+mu.val1 <- VaR.true.FA[1]
+mu.val25 <- VaR.true.FA[2]
+mu.val5 <- VaR.true.FA[3]
+source("script/Variation_check.R")
+df_mu_VaR <- df
+save(list=c("df_mu_VaR"),file="data/check_mu_VaR.Rdata")
+
+mu.val1 <- ES.true.FA[1]
+mu.val25 <- ES.true.FA[2]
+mu.val5 <- ES.true.FA[3]
+source("script/Variation_check.R")
+df_mu_ES <- df
+save(list=c("df_mu_ES"),file="data/check_mu_ES.Rdata")
+```
+
+
+
+```{r}
+load("data/check_mu_VaR.Rdata")
+load("data/check_mu_ES.Rdata")
+plot_b=ggplot(data=df_mu_VaR)+
+  geom_line(aes(N,value,lty=variable,col=variable),size=.8)+
+  geom_hline(aes(yintercept=-ES.true.FA[1]))+
+  geom_hline(aes(yintercept=-ES.true.FA[2]))+
+  geom_hline(aes(yintercept=-ES.true.FA[3]))+
+  geom_hline(aes(yintercept=-VaR.true.FA[1]))+
+  geom_hline(aes(yintercept=-VaR.true.FA[2]))+
+  geom_hline(aes(yintercept=-VaR.true.FA[3]))+
+  theme_bw()+ylab("Expected value")+
+  theme(#panel.grid.major = element_blank(),
+    #panel.grid.minor = element_blank(),
+    strip.background = element_blank(),
+    panel.border = element_rect(colour = "black"),
+    legend.title=element_blank(),legend.position="bottom",
+    legend.direction = "horizontal",legend.key.width = unit(12, "points"))+
+  geom_ribbon(aes(x=N,ymin=min,ymax=max,fill=variable),alpha=0.2)+
+  ggtitle("use VaR")+
+  xlim(c(0,10000))
+print(plot_b)
+
+plot_b=ggplot(data=df_mu_ES)+
+  geom_line(aes(N,value,lty=variable,col=variable),size=.8)+
+  geom_hline(aes(yintercept=-ES.true.FA[1]))+
+  geom_hline(aes(yintercept=-ES.true.FA[2]))+
+  geom_hline(aes(yintercept=-ES.true.FA[3]))+
+  geom_hline(aes(yintercept=-VaR.true.FA[1]))+
+  geom_hline(aes(yintercept=-VaR.true.FA[2]))+
+  geom_hline(aes(yintercept=-VaR.true.FA[3]))+
+  theme_bw()+ylab("Expected Value")+
+  theme(#panel.grid.major = element_blank(),
+    #panel.grid.minor = element_blank(),
+    strip.background = element_blank(),
+    panel.border = element_rect(colour = "black"),
+    legend.title=element_blank(),legend.position="bottom",
+    legend.direction = "horizontal",legend.key.width = unit(12, "points"))+
+  geom_ribbon(aes(x=N,ymin=min,ymax=max,fill=variable),alpha=0.2)+
+  ggtitle("use ES")+
+  xlim(c(0,10000))
+print(plot_b)
+
+```
+
+95\%点のESなど、明らかにESを使った方が良さそうです 
+
+
 
 ## 時系列版
 
