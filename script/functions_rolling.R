@@ -282,3 +282,44 @@ mle.dfas2_weight <- function(x, weight, ini){
   out$par2[2] <- exp(out$par[2])
   out
 }
+
+IS.fa_loacation_pre <- function(){
+  par <- fit$par2
+  #weightを計算する
+  w1 <- dfas2(rfa1, mu=par[1], sigma=par[2],lambda=par[3], delta=par[4])/
+    dfas2(rfa1, mu=ES1.fa, sigma=par[2],lambda=par[3], delta=par[4])
+  w25 <- dfas2(rfa25, mu=par[1], sigma=par[2],lambda=par[3], delta=par[4])/
+    dfas2(rfa25, mu=ES25.fa, sigma=par[2],lambda=par[3], delta=par[4])
+  w5 <- dfas2(rfa5, mu=par[1], sigma=par[2],lambda=par[3], delta=par[4])/
+    dfas2(rfa5, mu=ES5.fa, sigma=par[2],lambda=par[3], delta=par[4])
+  
+  #99%点での計算 100~10000までサンプル数を増やして行う
+  out1<-cbind( rfa1,  w1/10000)
+  # サンプルの小さい順にならべかえる
+  A <- out1[sort.list(out1[,1]),]
+  # weightの累積和を並べる
+  A <- cbind(A, cumsum(A[,2]))
+  # 累積和が0.01に一番近いサンプルが99%VaR
+  # v1までのサンプルからES0.01の推定値を求める
+  v1 <- A[which.min(abs(A[,3]-0.01)),1]
+  es1<- sum(apply(A[1:which.min(abs(A[,3]-0.01)),1:2],1,prod))/0.01
+  out1 <- c(v1, es1)
+  
+  
+  out25<-cbind(rfa25,  w25/10000)
+  A <- out25[sort.list(out25[,1]),]
+  A <- cbind(A, cumsum(A[,2]))
+  v25 <- A[which.min(abs(A[,3]-0.025)),1]
+  es25<- sum(apply(A[1:which.min(abs(A[,3]-0.025)),1:2],1,prod))/0.025
+  out25 <- c(v25, es25)
+  
+  out5<-cbind( rfa5,  w5/10000)
+  A <- out5[sort.list(out5[,1]),]
+  A <- cbind(A, cumsum(A[,2]))
+  v5 <- A[which.min(abs(A[,3]-0.05)),1]
+  es5<- sum(apply(A[1:which.min(abs(A[,3]-0.05)),1:2],1,prod))/0.05
+  out5 <- c(v5, es5)
+  
+  return(out = cbind(t(out1),t(out25),t(out5)))
+  
+}

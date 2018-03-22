@@ -1336,9 +1336,11 @@ print(plot_b)
 
 <a name="newpage"></a>
 
-## 時系列版
+# 時系列
 
-```{r, eval=FALSE}
+重み付きで推定したパラメータを用いて、location shiftで、時系列に推定
+
+```{r,eval=FALSE}
 IS.fa.outs <- c()
 IS.norm.outs <- c()
 SMC.fa.outs <- c()
@@ -1347,287 +1349,79 @@ SMC.norm.outs <- c()
 cl <- makeCluster(detectCores()-1)  # クラスタの作成
 registerDoParallel(cl)
 cl_l <- detectCores()-1
-clusterExport(cl,list("s_inverse","dfas","dfas2","Cf","Sf",
-                      "cl_l","rfa_SIR","Resample1"))
-result2 <- c()
-result2<-foreach(i = 2:(length(df$log_x)-249), .combine='cbind') %dopar% {
-  rt <- df$log_x[i:(i+249)]
-  rt <- rt[rt!=0]
-  #パラメータ推定の結果は、先ほどのものを使い回す。
-  para <- c(result[ , i-1, c("sigma","lambda","delta")])
-  
-  #真値計算?
-  #99%,97.5%,95%の各点に対して，先ほどの関数を用いて求める
-  VaR1.fa <- qfas(0.01, mu=para[1], sigma= para[2],
-                  lambda=para[3], delta = para[4])
-  VaR25.fa <- qfas(0.025, mu=para[1], sigma=para[2],
-                   lambda=para[3], delta = para[4])
-  VaR5.fa <- qfas(0.05, mu=para[1], sigma=para[2],
-                  lambda=para[3], delta = para[4])
-  VaR.true.FA <- c(VaR1.fa ,VaR25.fa ,VaR5.fa )
-  
-  # 99%,97.5%,95%それぞれのVaRと平均が一致するthetaを取得
-  rfa.IS.1<-rIS_SIR2(n=20000, par=c(VaR.true.FA[1], para[2:4]),
-                     par2=c(VaR.true.FA[1], sd(rt)))
-  rfa.IS.25<-rIS_SIR2(n=20000, par=c(VaR.true.FA[2], para[2:4]), 
-                      par2=c(VaR.true.FA[2], sd(rt)))
-  rfa.IS.5<-rIS_SIR2(n=20000, par=c(VaR.true.FA[3], para[2:4]), 
-                     par2=c(VaR.true.FA[3], sd(rt)))
-  # サンプリングしたものを入力としてFA分布の重点サンプリングを行う
-  rfa1 <- sample(rfa.IS.1$q, 10000)
-  rfa25 <- sample(rfa.IS.25$q, 10000)
-  rfa5 <- sample(rfa.IS.5$q, 10000)
-  #clusterExport(cl,list("rfa1","rfa25","rfa5"))
-  IS.fa.out <- NULL
-  #重点サンプリング
-  fit$par2 <- as.vector(para)
-  while(is.null(IS.fa.out)){
-    try(IS.fa.out <- IS.fa_pre())
-  }
-  
-  
-  c(i, IS.fa.out, VaR.true.FA)
-}
-
-stopCluster(cl)
-save(list=c("result2"),file="data/rolling_result_locationshift.Rdata")
-
-```
-
-```{r}
-load("data/rolling_result_locationshift.Rdata")
-result2 <- t(result2)
-colnames(result2) <- c("dt",
-                      "IS_VaR_fa_0.01","IS_ES_fa_0.01",
-                      "IS_VaR_fa_0.025","IS_ES_fa_0.025",
-                      "IS_VaR_fa_0.05","IS_ES_fa_0.05",
-                      "VaR.01","VaR.025","VaR.05")
-
-result2_VaR <- result2[,c(1,2,4,6)] %>% data.frame()
-
-result2_ES <- result2[,c(1,3,5,7)]  %>% data.frame()
-
-result2_para <- result2[,c(1, 8, 9, 10)]  %>% data.frame()
-```
-
-```{r plot2}
-result2_VaR$dt <- df$dt[c(251:length(df$dt))]
-result2_ES$dt <- df$dt[c(251:length(df$dt))]
-result2_para$dt <- df$dt[c(251:length(df$dt))]
-plot2_VaR <- result2_VaR %>% data.frame() %>% melt(id="dt")
-plot2_ES <- result2_ES %>% data.frame() %>% melt(id="dt")
-plot2_para <- result2_para %>% data.frame() %>% melt(id="dt")
-
-plot2_VaR$level <- apply(plot2_VaR,1,function(x) substr(x["variable"],
-                                    regexpr("0.0", x["variable"]),
-                                    nchar(x["variable"])))
-
-plot2_VaR$method <- apply(plot2_VaR,1,function(x)
-  paste(strsplit(x["variable"][1] %>% as.character(),"_")[[1]][1],
-             strsplit(x["variable"] %>% as.character(),"_")[[1]][3]," location shift")
-  )
-
-
-plot2_ES$level <- apply(plot2_ES,1,function(x) substr(x["variable"],
-                                    regexpr("0.0", x["variable"]),
-                                    nchar(x["variable"])))
-
-plot2_ES$method <- apply(plot2_ES,1,function(x)
-  paste(strsplit(x["variable"][1] %>% as.character(),"_")[[1]][1],
-             strsplit(x["variable"] %>% as.character(),"_")[[1]][3]," location shift")
-  )
-
-ggplot() +
-  geom_line(data=plot2_VaR,
-    aes(x=dt,y=value,colour=method)) +
-  geom_line(data=plot_VaR,
-    aes(x=dt,y=value,colour=method)) +
-  geom_line(data=df[c(252:length(df$dt)),],
-            aes(x=dt,y=log_x))+
-  facet_grid(level~.,scales = "free")+
-  theme_bw()+
-  ggtitle("VaR and log return")
-
-ggplot() +
-  geom_line(data=plot2_VaR,
-    aes(x=dt,y=-value,colour=method)) +
-  geom_line(data=plot_VaR,
-    aes(x=dt,y=-value,colour=method)) +
-  facet_grid(level~.,scales = "free")+
-  theme_bw()+
-  ggtitle("VaR")
-
-ggplot() +
-  geom_line(data = plot2_ES,aes(x=dt,y=-value,colour=method))+
-  geom_line(data = plot_ES,aes(x=dt,y=-value,colour=method))+
-  theme_bw()+
-  facet_grid(level~.,scales = "free")+
-  ggtitle("ES")
-```
-
-わかりずらいので、対応するものだけ並べる
-
-
-```{r}
-ggplot() +
-  geom_line(data=plot2_VaR,
-    aes(x=dt,y=value,colour=method)) +
-  geom_line(data=plot_VaR %>% filter(method == "IS fa"),
-    aes(x=dt,y=value,colour=method)) +
-  geom_line(data=df[c(252:length(df$dt)),],
-            aes(x=dt,y=log_x))+
-  facet_grid(level~.,scales = "free")+
-  theme_bw()+
-  ggtitle("VaR and log return")
-
-ggplot() +
-  geom_line(data=plot2_VaR,
-    aes(x=dt,y=-value,colour=method)) +
-  geom_line(data=plot_VaR %>% filter(method == "IS fa"),
-    aes(x=dt,y=-value,colour=method)) +
-  facet_grid(level~.,scales = "free")+
-  theme_bw()+
-  ggtitle("VaR")
-
-ggplot() +
-  geom_line(data = plot2_ES,aes(x=dt,y=-value,colour=method))+
-  geom_line(data = plot_ES %>% filter(method == "IS fa"),aes(x=dt,y=-value,colour=method))+
-  theme_bw()+
-  facet_grid(level~.,scales = "free")+
-  ggtitle("ES")
-```
-
-
-## 評価
-
-```{r check2}
-#VaR
-check2_VaR <- apply(data.frame(df$log_x[251:length(df$log_x)], -result2_VaR[,-1]), 1,
-      function(x) x[1] > x[-1]) %>% t()
-
-count2_VaR <- colSums(check2_VaR)
-print("Check count over Estimate VaR")
-```
-
-```{r}
-print("location shift var")
-count2_VaR/ dim(check2_VaR)[1]
-```
-
-普通のと比較
-```{r}
-print("normal var")
-count_VaR/ dim(check_VaR)[1]
-```
-
-1\%は一緒、2.5\%や5\%は、元のやつのほうが良さげです・・・
-
-```{r}
-#ES?
-eval2_ES <- check2_VaR * apply(result2_ES[,-1],2,function(x) abs(df$log_x[c(251:length(df$dt))] - x)/ -x)
-
-colMeans(eval2_ES)
-colMeans(eval_ES)
-```
-
-
-## パラメータについて(変更しているmu=VaRの真値を確認)
-
-```{r}
-ggplot(plot2_para) +
-  geom_line(aes(x=dt,y=value,color=variable))+
-  theme_bw()+
-  facet_grid(variable~.,scales = "free")+
-  ggtitle("parameters")+
-  guides(colour=FALSE)
-```
-
-
-
-# 重み付きパラメータ推定 + ロケーションシフト
-
-重み付きで推定したパラメータを用いて、location shift
-
-```{r, eval=FALSE}
-IS.fa.outs <- c()
-IS.norm.outs <- c()
-SMC.fa.outs <- c()
-SMC.norm.outs <- c()
-
-cl <- makeCluster(detectCores()-1)  # クラスタの作成
-registerDoParallel(cl)
-cl_l <- detectCores()-1
-clusterExport(cl,list("s_inverse","dfas","dfas2","Cf","Sf",
-                      "cl_l","rfa_SIR","Resample1"))
+clusterExport(cl,list("s_inverse","dfas","dfas2","Cf","Sf","cl_l","rfa_SIR","Resample1"))
 result4 <- c()
-result4<-foreach(i = 2:(length(df$log_x)-249), .combine='cbind') %dopar% {
+for(i in 2:(length(df$log_x)-249)){
   rt <- df$log_x[i:(i+249)]
   rt <- rt[rt!=0]
-  #パラメータ推定の結果は、先ほどのものを使い回す。
-  para <- c(result3[i-1, c("mu","sigma","lambda","delta")])
   fit$par2 <- c(result3[i-1, c("mu","sigma","lambda","delta")])
+  #99%,97.5%,95%の各点に対して，ESを求める
+  ES1.fa <- find.ES(p=0.01, par=fit$par2)
+  ES25.fa <- find.ES(p=0.025, par=fit$par2)
+  ES5.fa <- find.ES(p=0.05, par=fit$par2)
   
+  clusterExport(cl,list("fit","ES1.fa","ES25.fa","ES5.fa"))
   
-  #真値計算?
-  #99%,97.5%,95%の各点に対して，先ほどの関数を用いて求める
-  VaR1.fa <- qfas(0.01, mu=para[1], sigma= para[2],
-                  lambda=para[3], delta = para[4])
-  VaR25.fa <- qfas(0.025, mu=para[1], sigma=para[2],
-                   lambda=para[3], delta = para[4])
-  VaR5.fa <- qfas(0.05, mu=para[1], sigma=para[2],
-                  lambda=para[3], delta = para[4])
-  VaR.true.FA <- c(VaR1.fa ,VaR25.fa ,VaR5.fa )
+  IS.fa.out <- NULL
+  #重点サンプリング
+  while(is.null(IS.fa.out)){
+  # 99%,97.5%,95%それぞれのESと平均が一致する乱数発生
+  rfa.IS.1<-rfa_SIR_para(n=20000, mu=ES1.fa,
+                        sigma = fit$par2[2],
+                        lambda = fit$par2[3],
+                        delta = fit$par2[4])
+  rfa.IS.25<-rfa_SIR_para(n=20000, mu=ES25.fa,
+                        sigma = fit$par2[2],
+                        lambda = fit$par2[3],
+                        delta = fit$par2[4])
+  rfa.IS.5<-rfa_SIR_para(n=20000, mu=ES5.fa,
+                        sigma = fit$par2[2],
+                        lambda = fit$par2[3],
+                        delta = fit$par2[4])
   
-  # 99%,97.5%,95%それぞれのVaRと平均が一致するthetaを取得
-  rfa.IS.1<-rIS_SIR2(n=20000, par=c(VaR.true.FA[1], para[2:4]),
-                     par2=c(VaR.true.FA[1], sd(rt)))
-  rfa.IS.25<-rIS_SIR2(n=20000, par=c(VaR.true.FA[2], para[2:4]), 
-                      par2=c(VaR.true.FA[2], sd(rt)))
-  rfa.IS.5<-rIS_SIR2(n=20000, par=c(VaR.true.FA[3], para[2:4]), 
-                     par2=c(VaR.true.FA[3], sd(rt)))
   # サンプリングしたものを入力としてFA分布の重点サンプリングを行う
   rfa1 <- sample(rfa.IS.1$q, 10000)
   rfa25 <- sample(rfa.IS.25$q, 10000)
   rfa5 <- sample(rfa.IS.5$q, 10000)
+  clusterExport(cl,list("rfa1","rfa25","rfa5"))
   #clusterExport(cl,list("rfa1","rfa25","rfa5"))
-  IS.fa.out <- NULL
-  #重点サンプリング
-  while(is.null(IS.fa.out)){
-    try(IS.fa.out <- IS.fa_pre())
+    try(IS.fa.out <- IS.fa_loacation_pre())
   }
   
   
-  c(i, IS.fa.out, VaR.true.FA)
+  print(i)
+  result4 <- rbind(result4,
+                   c(i, IS.fa.out))
 }
 
 stopCluster(cl)
-save(list=c("result4"),file="data/rolling_result_locationshift_weight.Rdata")
+save(list=c("result4"),file="data/201800315.Rdata")
 ```
 
 
+
+
 ```{r}
-load("data/rolling_result_locationshift_weight.Rdata")
-result4 <- t(result4)
+load("data/201800315.Rdata")
 colnames(result4) <- c("dt",
                       "IS_VaR_fa_0.01","IS_ES_fa_0.01",
                       "IS_VaR_fa_0.025","IS_ES_fa_0.025",
-                      "IS_VaR_fa_0.05","IS_ES_fa_0.05",
-                      "VaR.01","VaR.025","VaR.05")
+                      "IS_VaR_fa_0.05","IS_ES_fa_0.05")
 
 result4_VaR <- result4[,c(1,2,4,6)] %>% data.frame()
 
 result4_ES <- result4[,c(1,3,5,7)]  %>% data.frame()
 
-result4_para <- result4[,c(1, 8, 9, 10)]  %>% data.frame()
+#result4_para <- result4[,c(1, 8, 9, 10)]  %>% data.frame()
 ```
 
 ```{r}
 result4_VaR$dt <- df$dt[c(251:length(df$dt))]
 result4_ES$dt <- df$dt[c(251:length(df$dt))]
-result4_para$dt <- df$dt[c(251:length(df$dt))]
+#result4_para$dt <- df$dt[c(251:length(df$dt))]
 plot4_VaR <- result4_VaR %>% data.frame() %>% melt(id="dt")
 plot4_ES <- result4_ES %>% data.frame() %>% melt(id="dt")
-plot4_para <- result4_para %>% data.frame() %>% melt(id="dt")
+#plot4_para <- result4_para %>% data.frame() %>% melt(id="dt")
 
 plot4_VaR$level <- apply(plot4_VaR,1,function(x) substr(x["variable"],
                                     regexpr("0.0", x["variable"]),
@@ -1653,8 +1447,6 @@ ggplot() +
     aes(x=dt,y=value,colour=method)) +
   geom_line(data=plot4_VaR,
     aes(x=dt,y=value,colour=method)) +
-  geom_line(data=plot2_VaR,
-    aes(x=dt,y=value,colour=method)) +
   geom_line(data=plot3_VaR,
     aes(x=dt,y=value,colour=method)) +
   geom_line(data=df[c(252:length(df$dt)),],
@@ -1670,8 +1462,6 @@ ggplot() +
     aes(x=dt,y=-value,colour=method)) +
   geom_line(data=plot3_VaR,
     aes(x=dt,y=-value,colour=method)) +
-  geom_line(data=plot2_VaR,
-    aes(x=dt,y=-value,colour=method)) +
   facet_grid(level~.,scales = "free")+
   theme_bw()+
   ggtitle("VaR")
@@ -1679,7 +1469,6 @@ ggplot() +
 ggplot() +
   geom_line(data = plot_ES %>% filter(method == "IS fa"),aes(x=dt,y=-value,colour=method))+
   geom_line(data = plot4_ES,aes(x=dt,y=-value,colour=method))+
-  geom_line(data = plot2_ES,aes(x=dt,y=-value,colour=method))+
   geom_line(data=plot3_ES,
     aes(x=dt,y=-value,colour=method)) +
   theme_bw()+
@@ -1688,21 +1477,5 @@ ggplot() +
 ```
 
 
-## 評価
+評価する分布が同じなので、推定結果自体はあんまり変わりませんね。。
 
-
-```{r}
-#VaR
-check4_VaR <- apply(data.frame(df$log_x[251:length(df$log_x)], -result4_VaR[,-1]), 1,
-      function(x) x[1] > x[-1]) %>% t()
-
-count4_VaR <- colSums(check4_VaR)
-print("Check count over Estimate VaR")
-print("weight location shift var")
-count4_VaR/ dim(check3_VaR)[1]
-
-#ES?
-eval4_ES <- check3_VaR * apply(result4_ES[,-1],2,function(x) abs(df$log_x[c(251:length(df$dt))] - x)/ -x)
-print("normal var")
-colMeans(eval4_ES)
-```
